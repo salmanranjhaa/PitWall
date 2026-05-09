@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 14% 4%;
+    --foreground: 240 20% 97%;
+    --card: 240 14% 8%;
+    --card-foreground: 240 20% 97%;
+    --popover: 240 14% 8%;
+    --popover-foreground: 240 20% 97%;
+    --primary: 7 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 240 20% 97%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 10% 55%;
+    --accent: 240 10% 12%;
+    --accent-foreground: 240 20% 97%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
+    --ring: 7 100% 50%;
+    --radius: 0.625rem;
+    --sidebar-background: 240 14% 4%;
+    --sidebar-foreground: 240 20% 97%;
+    --sidebar-primary: 7 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 240 20% 97%;
+    --sidebar-border: 240 10% 18%;
+    --sidebar-ring: 7 100% 50%;
+
+    --rosso: #FF1E00;
+    --rosso-dark: #CC1800;
+    --ferrari-gold: #FFB800;
+    --nero: #0A0A0F;
+    --carbon: #0F0F14;
+    --surface: #16161E;
+    --surface-inner: #1E1E28;
+    --border-subtle: #2D2D3D;
+    --text-primary: #F0F0F5;
+    --text-secondary: #8B8BA0;
+    --text-ghost: #55556B;
+    --soft-red: #E8103A;
+    --medium-yellow: #FFD300;
+    --hard-white: #F5F5F5;
+    --neural-purple: #7B61FF;
+    --neural-cyan: #00D4FF;
+    --weather-blue: #1E90FF;
+    --warning-amber: #FFAA00;
+    --opportunity-green: #00F5A0;
+    --info-blue: #4D9FFF;
+    --success-green: #00D084;
+    --alert-red: #FF2D2D;
+    --sc-yellow: #FFD700;
+    --vsc-orange: #FF6600;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-nero text-text-primary font-display antialiased;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 49px,
+        rgba(45, 45, 61, 0.08) 49px,
+        rgba(45, 45, 61, 0.08) 50px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 49px,
+        rgba(45, 45, 61, 0.08) 49px,
+        rgba(45, 45, 61, 0.08) 50px
+      );
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background-color: rgba(255, 30, 0, 0.3);
+    color: #F0F0F5;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0A0A0F;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2D2D3D;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3D3D4D;
+  }
+}
+
+@layer components {
+  .card-gradient {
+    background: linear-gradient(180deg, #16161E 0%, #1E1E28 100%);
+  }
+
+  .card-gradient-border {
+    position: relative;
+  }
+
+  .card-gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(180deg, rgba(45, 45, 61, 0.6) 0%, rgba(45, 45, 61, 0.1) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      #FF1E00 0%,
+      #FF4D33 25%,
+      #FF1E00 50%,
+      #FF4D33 75%,
+      #FF1E00 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+
+  .recharts-default-tooltip {
+    background-color: #16161E !important;
+    border: 1px solid #2D2D3D !important;
+    border-radius: 8px !important;
+    color: #F0F0F5 !important;
+  }
+}

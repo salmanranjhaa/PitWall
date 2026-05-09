@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env
+*.db
+*.sqlite3
+
+# Node / frontend
+node_modules/
+dist/
+.cache/
+*.local
+
+# Vite build output
+frontend-app/dist/
+app/dist/
+scuderia-v2-dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ML / data
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+data/raw/
+data/processed/
+research/
+
+# Misc planning docs (keep HANDOVER, SPEC for context)
+plan.md
+plan-v2.md
+design-v2/
