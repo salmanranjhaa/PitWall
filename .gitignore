@@ -43,12 +43,15 @@ yarn-error.log*
 
 # ML / data
 *.pkl
+*.ff1pkl
 *.joblib
 *.h5
 *.pt
 *.pth
+*.sqlite
 data/raw/
 data/processed/
+data/cache/
 research/
 
 # Misc planning docs (keep HANDOVER, SPEC for context)
