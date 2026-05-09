@@ -21,6 +21,8 @@ from .weather import WeatherState, WeatherSystem
 from .ai_opponents import (
     Driver, AIOpponentController, DRIVER_DATABASE, TEAM_BASE_PACE,
 )
+from ..agents.driver_agent import DriverAgent, AgentAction
+from ..agents.engineer_agent import RaceEngineerAgent
 from .events import (
     RaceEventBus, RaceEvent, SafetyCarController, FlagState, Incident,
 )
@@ -178,6 +180,8 @@ class RaceState:
     flag: FlagState = FlagState.GREEN
     incidents: List[Dict[str, Any]] = field(default_factory=list)
     events_log: List[Dict[str, Any]] = field(default_factory=list)
+    bdi_states: Dict[int, dict] = field(default_factory=dict)
+    engineer_recommendation: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize race state to a dictionary."""
@@ -197,7 +201,7 @@ class RaceState:
 
         messages_list = [m.to_dict() for m in self.messages]
 
-        return {
+        result = {
             "lap": self.lap,
             "total_laps": self.total_laps,
             "status": self.status,
@@ -212,6 +216,11 @@ class RaceState:
             "current_lap": self.lap,
             "strategy_messages": messages_list,
         }
+        if self.bdi_states:
+            result["bdi_states"] = self.bdi_states
+        if self.engineer_recommendation:
+            result["engineer_recommendation"] = self.engineer_recommendation
+        return result
 
 
 # =============================================================================
@@ -437,12 +446,28 @@ class RaceEngine:
         if self._player_car is None:
             self._player_car = self._cars[0]
 
-        # Initialize AI controller
+        # Initialize AI controller (kept for incident generation + overtake probability)
         self._ai_controller = AIOpponentController(
             drivers=[c.driver for c in self._cars if c.driver.team != self.player_team],
             track=self.track,
             random_seed=self._seed,
         )
+
+        # Create one BDI DriverAgent per AI car
+        self._driver_agents: Dict[int, DriverAgent] = {}
+        for car in self._cars:
+            if car.driver.number != self._player_car.driver.number:
+                self._driver_agents[car.driver.number] = DriverAgent(
+                    driver=car.driver,
+                    rng=self._rng,
+                )
+
+        # Race engineer agent for player recommendations
+        self._engineer_agent = RaceEngineerAgent()
+
+        # Store last BDI state for API serialisation
+        self._bdi_states: Dict[int, dict] = {}
+        self._engineer_recommendation: Dict[str, Any] = {}
 
         # Build initial state
         self._state = RaceState(
@@ -512,6 +537,11 @@ class RaceEngine:
         if "ers_mode" in actions and self._player_car:
             self._player_car.ers_mode = actions["ers_mode"]
 
+        # Reset per-lap agent modifiers
+        for car in self._cars:
+            car._pace_multiplier = 1.0  # type: ignore[attr-defined]
+            car._defending = False      # type: ignore[attr-defined]
+
         # 3. Calculate lap times for all cars
         self._calculate_lap_times()
 
@@ -521,11 +551,11 @@ class RaceEngine:
         # 5. Update gaps FIRST so pit decisions and overtakes use fresh gap data
         self._update_gaps()
 
-        # 6. Process AI pit decisions (uses fresh gaps from step 5)
-        self._process_ai_pit_decisions()
+        # 6. Run BDI agent cycle (replaces _process_ai_pit_decisions + _process_overtakes)
+        self._run_agent_cycle()
 
-        # 7. Process overtakes (uses fresh gaps from step 5)
-        self._process_overtakes()
+        # 7. Run race engineer cycle for player recommendations
+        self._run_engineer_cycle()
 
         # 8. Check and generate incidents
         self._check_incidents()
@@ -590,6 +620,10 @@ class RaceEngine:
             car.position = i
 
         self._state.player = self._player_car
+
+        # Attach BDI state to RaceState for API serialization
+        self._state.bdi_states = self._bdi_states
+        self._state.engineer_recommendation = self._engineer_recommendation
 
         return self._state
 
@@ -747,6 +781,10 @@ class RaceEngine:
             elif self._state.flag == FlagState.VSC:
                 lap_time *= 1.12  # ~12% slower under VSC
 
+            # Apply agent pace multiplier
+            if hasattr(car, '_pace_multiplier') and car._pace_multiplier != 1.0:
+                lap_time *= car._pace_multiplier
+
             car.lap_time = max(lap_time, self.track.reference_lap_times.get(car.tire.compound, 90.0) * 0.90)
             car.total_time += car.lap_time
             car.tire.age += 1
@@ -811,7 +849,176 @@ class RaceEngine:
         for i, car in enumerate(alive_cars, 1):
             car.position = i
 
-    def _process_ai_pit_decisions(self) -> None:
+    def _run_agent_cycle(self) -> None:
+        """Run one BDI tick for all AI driver agents."""
+        race_state = self.get_state()
+
+        for driver_number, agent in self._driver_agents.items():
+            car = self._get_car(driver_number)
+            if car is None or not car.alive or car.finished:
+                continue
+
+            # BDI cycle
+            agent.perceive(race_state)
+            agent.deliberate()
+            agent.select_plan()
+            action: AgentAction = agent.execute()
+
+            # Store BDI state for API
+            self._bdi_states[driver_number] = agent.bdi_state()
+
+            # Apply action to simulation
+            self._apply_agent_action(car, action)
+
+    def _apply_agent_action(self, car: CarState, action: AgentAction) -> None:
+        """
+        Translate an AgentAction into simulation effects.
+        This is the bridge between BDI output and physics engine.
+        """
+        if action.action_type == "PIT":
+            # Queue a pit stop (same path as player pit but for AI)
+            self._execute_ai_pit(car, action.compound)
+
+        elif action.action_type == "PUSH":
+            # Increase lap pace — intensity > 1.0 adds time risk
+            car._pace_multiplier = action.intensity  # type: ignore[attr-defined]
+
+        elif action.action_type == "MANAGE":
+            # Reduce pace — intensity < 1.0 slows down, saves tires
+            car._pace_multiplier = action.intensity  # type: ignore[attr-defined]
+
+        elif action.action_type == "ATTACK":
+            # Attempt overtake (calls existing overtake logic)
+            self._attempt_agent_overtake(car, action)
+
+        elif action.action_type == "DEFEND":
+            # Defensive driving — block inside line (increases overtake difficulty)
+            car._defending = True  # type: ignore[attr-defined]
+
+        # NONE: no special action this lap
+
+    def _attempt_agent_overtake(self, attacker: CarState, action: AgentAction) -> None:
+        """Attempt an overtake driven by an agent's ATTACK action."""
+        if self._state.flag != FlagState.GREEN:
+            return
+
+        # Find defender (car immediately ahead)
+        alive_cars = [c for c in self._cars if c.alive and not c.finished]
+        alive_cars.sort(key=lambda c: c.total_time)
+
+        defender = None
+        for i, car in enumerate(alive_cars):
+            if car.driver.number == attacker.driver.number and i > 0:
+                defender = alive_cars[i - 1]
+                break
+
+        if defender is None:
+            return
+
+        gap = attacker.total_time - defender.total_time
+        if gap >= 1.2:
+            return
+
+        # Cooldown: same pair can't fight again too soon
+        COOLDOWN_LAPS = 4
+        pair_key = (attacker.driver.number, defender.driver.number)
+        last_lap = self._overtake_cooldown.get(pair_key, -999)
+        if self._current_lap - last_lap < COOLDOWN_LAPS:
+            return
+
+        # Pace check: attacker must be genuinely faster this lap
+        pace_delta = defender.lap_time - attacker.lap_time
+        drs_ok = attacker.drs_available
+        if pace_delta < 0.15 and not drs_ok:
+            # Failed attempt at close range → possible contact
+            if gap < 0.4 and self._current_lap > 1:
+                self._check_contact(attacker, defender)
+            return
+
+        # Attempt overtake via AI controller probability model
+        success = False
+        if self._ai_controller:
+            # If defender is in DEFEND mode, reduce success probability
+            defend_factor = 0.75 if getattr(defender, '_defending', False) else 1.0
+            raw_success = self._ai_controller.attempt_overtake(
+                attacker.driver, defender.driver, self._state
+            )
+            success = raw_success and self._rng.random() < defend_factor
+
+        if success:
+            overtake_bonus = 0.4 + self._rng.random() * 0.4
+            attacker.total_time = defender.total_time - overtake_bonus
+
+            self._overtake_cooldown[pair_key] = self._current_lap
+            self._overtake_cooldown[(defender.driver.number, attacker.driver.number)] = self._current_lap
+
+            event = RaceEvent(
+                event_type="overtake",
+                lap=self._current_lap,
+                data={
+                    "attacker": attacker.driver.name,
+                    "attacker_number": attacker.driver.number,
+                    "defender": defender.driver.name,
+                    "defender_number": defender.driver.number,
+                },
+            )
+            self._event_bus.emit(event)
+            self._state.events_log.append(event.to_dict())
+        else:
+            if gap < 0.4 and self._current_lap > 1:
+                self._check_contact(attacker, defender)
+
+    def _execute_ai_pit(self, car: CarState, compound: Optional[str]) -> None:
+        """Execute a pit stop for an AI car driven by agent action."""
+        if not car.alive or car.finished:
+            return
+        compound = compound or "MEDIUM"
+        pit_time = self.track.pit_loss_time + car.pending_time_penalty
+        car.total_time += pit_time
+        car.pending_time_penalty = 0.0
+        car.tire = TireState(compound=compound, age=0, wear=0.0)
+        car.pits += 1
+
+        event = RaceEvent(
+            event_type="pit",
+            lap=self._current_lap,
+            data={
+                "driver": car.driver.name,
+                "driver_number": car.driver.number,
+                "compound": compound,
+                "reason": "agent strategy",
+            },
+        )
+        self._event_bus.emit(event)
+        self._state.events_log.append(event.to_dict())
+
+    def _run_engineer_cycle(self) -> None:
+        """Update the race engineer agent and store its recommendation."""
+        self._engineer_agent.perceive(self._player_car.driver.number, self.get_state())
+        self._engineer_agent.deliberate()
+        rec = self._engineer_agent.recommend()
+        self._engineer_recommendation = {
+            "priority": rec.priority,
+            "action": rec.action,
+            "compound": rec.compound,
+            "headline": rec.headline,
+            "rationale": rec.rationale,
+            "confidence": rec.confidence,
+            "pit_window": list(rec.pit_window) if rec.pit_window else None,
+        }
+
+    def _get_car(self, driver_number: int) -> Optional[CarState]:
+        """Find a car by driver number."""
+        for car in self._cars:
+            if car.driver.number == driver_number:
+                return car
+        return None
+
+    # ------------------------------------------------------------------
+    # Legacy methods (archived, not deleted — kept for reference)
+    # ------------------------------------------------------------------
+
+    def _process_ai_pit_decisions_legacy(self) -> None:
         """
         Process pit stop decisions for all AI-controlled cars.
 
@@ -857,7 +1064,7 @@ class RaceEngine:
                 self._event_bus.emit(event)
                 self._state.events_log.append(event.to_dict())
 
-    def _process_overtakes(self) -> None:
+    def _process_overtakes_legacy(self) -> None:
         """
         Process overtaking attempts between adjacent cars.
 
