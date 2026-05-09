@@ -343,6 +343,26 @@ export interface RaceEventEntry {
   data?: Record<string, unknown>;
 }
 
+export interface BDIState {
+  driver_number: number;
+  top_desire: string | null;
+  top_desire_reason: string;
+  current_plan: string | null;
+  plan_step: number;
+  tire_degrading_faster: boolean;
+  gap_ahead_trend: number;
+}
+
+export interface EngineerRecommendation {
+  priority: "URGENT" | "OPPORTUNITY" | "INFO";
+  action: "PIT_NOW" | "STAY_OUT" | "PUSH" | "MANAGE" | "MONITOR";
+  compound: string | null;
+  headline: string;
+  rationale: string;
+  confidence: number;
+  pit_window: [number, number] | null;
+}
+
 export interface RaceState {
   current_lap: number;
   lap?: number;
@@ -358,6 +378,8 @@ export interface RaceState {
   events_log?: RaceEventEntry[];
   flag?: string;
   finished: boolean;
+  bdi_states?: Record<number, BDIState>;
+  engineer_recommendation?: EngineerRecommendation;
 }
 
 export interface StrategyMsg {

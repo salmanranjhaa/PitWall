@@ -164,3 +164,25 @@ export function getTireCompoundLabel(compound: 'S' | 'M' | 'H'): string {
 export function getTireColor(compound: 'S' | 'M' | 'H'): string {
   return compound === 'S' ? '#E8103A' : compound === 'M' ? '#FFD300' : '#F5F5F5';
 }
+
+// ─── BDI Agent Types ───────────────────────────────────────────
+
+export interface BDIState {
+  driver_number: number;
+  top_desire: string | null;
+  top_desire_reason: string;
+  current_plan: string | null;
+  plan_step: number;
+  tire_degrading_faster: boolean;
+  gap_ahead_trend: number;
+}
+
+export interface EngineerRecommendation {
+  priority: 'URGENT' | 'OPPORTUNITY' | 'INFO';
+  action: 'PIT_NOW' | 'STAY_OUT' | 'PUSH' | 'MANAGE' | 'MONITOR';
+  compound: string | null;
+  headline: string;
+  rationale: string;
+  confidence: number;
+  pit_window: [number, number] | null;
+}

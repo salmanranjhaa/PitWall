@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import StatsRow from '@/components/dashboard/StatsRow';
 import LeftSidebar from '@/components/dashboard/LeftSidebar';
 import LapChart from '@/components/dashboard/LapChart';
 import LeaderboardTable from '@/components/dashboard/LeaderboardTable';
 import LapHistory from '@/components/dashboard/LapHistory';
+import BDIDebugPanel from '@/components/dashboard/BDIDebugPanel';
 import {
   TOTAL_LAPS,
   fullLapData,
@@ -12,6 +13,7 @@ import {
   lapHistoryData,
   type LeaderboardEntry,
   type LapHistoryEntry,
+  type EngineerRecommendation,
 } from '@/components/dashboard/data';
 
 const easePrimary = [0.16, 1, 0.3, 1] as [number, number, number, number];
@@ -27,18 +29,71 @@ export default function Dashboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(initialLeaderboard);
   const [lapHistory, setLapHistory] = useState<LapHistoryEntry[]>(lapHistoryData);
 
-  // Player team (Mercedes, P1)
-  const playerTeam: LeaderboardEntry = {
-    position: 1,
-    team: 'Mercedes',
-    teamColor: '#00F5D4',
-    tire: currentTire,
-    tireAge,
-    lastLap: 117.041,
-    stops: pitStops,
-    gap: '\u2014',
-    isPlayer: true,
-  };
+  // ─── Engineer Recommendation (from BDI race state) ───────────
+  const engineerRec: EngineerRecommendation | null = useMemo(() => {
+    // Simulate BDI-driven recommendations based on race conditions
+    if (currentLap >= 10 && currentLap <= 14 && currentTire === 'S') {
+      return {
+        priority: 'URGENT',
+        action: 'PIT_NOW',
+        compound: 'MEDIUM',
+        headline: 'Box this lap — MEDIUM',
+        rationale: 'SOFT tire degradation accelerating — pit window opening',
+        confidence: 0.92,
+        pit_window: [currentLap, currentLap + 1],
+      };
+    }
+    if (currentLap >= 26 && currentLap <= 30 && currentTire === 'M') {
+      return {
+        priority: 'URGENT',
+        action: 'PIT_NOW',
+        compound: 'HARD',
+        headline: 'Box this lap — HARD',
+        rationale: 'MEDIUM tires at limit — switch to HARD for final stint',
+        confidence: 0.90,
+        pit_window: [currentLap, currentLap + 1],
+      };
+    }
+    if (currentLap > 5 && currentLap < 10 && currentTire === 'S') {
+      return {
+        priority: 'OPPORTUNITY',
+        action: 'PUSH',
+        compound: null,
+        headline: 'Push to open gap before pit window',
+        rationale: 'Build gap to car behind to protect position after pit stop',
+        confidence: 0.78,
+        pit_window: null,
+      };
+    }
+    return {
+      priority: 'INFO',
+      action: 'MONITOR',
+      compound: null,
+      headline: 'All systems nominal',
+      rationale: 'No immediate action required.',
+      confidence: 0.85,
+      pit_window: null,
+    };
+  }, [currentLap, currentTire]);
+
+  // ─── Mock BDI states for debug panel ─────────────────────────
+  const bdiStates = useMemo(() => {
+    const states: Record<number, import('@/components/dashboard/data').BDIState> = {};
+    const mockPlans = ['FOLLOW_AND_WAIT', 'PUSH_MODE', 'ATTACK_DRS_ZONE', 'MANAGE_MODE'];
+    const mockDesires = ['GAIN_POSITION', 'PROTECT_POSITION', 'PIT_NOW', 'WIN_RACE'];
+    for (let i = 1; i <= 5; i++) {
+      states[i] = {
+        driver_number: i,
+        top_desire: mockDesires[(i + currentLap) % mockDesires.length],
+        top_desire_reason: 'agent deliberation',
+        current_plan: mockPlans[(i + currentLap) % mockPlans.length],
+        plan_step: (currentLap % 3) + 1,
+        tire_degrading_faster: i % 3 === 0,
+        gap_ahead_trend: parseFloat(((Math.random() - 0.5) * 0.4).toFixed(3)),
+      };
+    }
+    return states;
+  }, [currentLap]);
 
   // ─── Countdown Timer ─────────────────────────────────────────
   useEffect(() => {
@@ -120,6 +175,21 @@ export default function Dashboard() {
   // ─── Chart Data (only show up to current lap) ────────────────
   const chartData = fullLapData.slice(0, currentLap);
 
+  // ─── Recommendation styling ──────────────────────────────────
+  const recBorderColor =
+    engineerRec?.priority === 'URGENT'
+      ? '#FF2D2D'
+      : engineerRec?.priority === 'OPPORTUNITY'
+      ? '#FFB800'
+      : '#00F5D4';
+
+  const recBgColor =
+    engineerRec?.priority === 'URGENT'
+      ? 'rgba(255,45,45,0.08)'
+      : engineerRec?.priority === 'OPPORTUNITY'
+      ? 'rgba(255,184,0,0.08)'
+      : 'rgba(0,245,212,0.08)';
+
   // ─── Render ──────────────────────────────────────────────────
   return (
     <div
@@ -135,7 +205,7 @@ export default function Dashboard() {
         totalLaps={TOTAL_LAPS}
         lastLapTime={lapHistory[0]?.time ?? 117.041}
         position={1}
-        playerTeam={playerTeam}
+        playerTeam={leaderboard.find((e) => e.isPlayer) ?? leaderboard[0]}
       />
 
       {/* Three-column layout */}
@@ -166,13 +236,18 @@ export default function Dashboard() {
           {/* Spacer to push lap history to bottom */}
           <div className="flex-1 min-h-[80px]" />
 
+          {/* BDI Debug Panel (dev-only) */}
+          {import.meta.env.DEV && (
+            <BDIDebugPanel bdiStates={bdiStates} />
+          )}
+
           {/* AI Recommendation Panel (center-bottom) */}
           <motion.div
             className="relative rounded-lg overflow-hidden mb-4 mx-0"
             style={{
               background: 'linear-gradient(160deg, #16161E 0%, #13131A 100%)',
               border: '1px solid #2D2D3D',
-              borderTop: '3px solid #FFB800',
+              borderTop: `3px solid ${recBorderColor}`,
             }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -181,33 +256,56 @@ export default function Dashboard() {
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background:
-                  'linear-gradient(90deg, transparent 0%, rgba(255,184,0,0.08) 50%, transparent 100%)',
+                background: `linear-gradient(90deg, transparent 0%, ${recBgColor} 50%, transparent 100%)`,
                 animation: 'shimmer 2s infinite',
               }}
             />
             <div className="p-4 relative z-10 flex items-center gap-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="#FFB800" />
+                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill={recBorderColor} />
                 </svg>
                 <span
                   className="text-xs font-semibold tracking-[0.1em] uppercase"
-                  style={{ color: '#FFB800' }}
+                  style={{ color: recBorderColor }}
                 >
-                  KI-STRATEGIE
+                  {engineerRec?.priority === 'URGENT'
+                    ? 'URGENT'
+                    : engineerRec?.priority === 'OPPORTUNITY'
+                    ? 'OPPORTUNITY'
+                    : 'KI-STRATEGIE'}
                 </span>
               </div>
-              <p className="text-sm" style={{ color: '#F0F0F5' }}>
-                Empfehlung für{' '}
-                <span className="font-semibold" style={{ color: '#FFB800' }}>
-                  {selectedNextTire === 'S' ? 'SOFT' : selectedNextTire === 'M' ? 'MEDIUM' : 'HARD'}
-                </span>
-                : Pitstop in Runde{' '}
-                <span className="font-semibold" style={{ color: '#FFB800' }}>
-                  {currentTire === 'S' ? 12 : currentTire === 'M' ? 28 : 44}
-                </span>
-              </p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm truncate" style={{ color: '#F0F0F5' }}>
+                  {engineerRec?.headline ?? 'Strategy recommendation'}
+                </p>
+                {engineerRec?.rationale && (
+                  <p className="text-xs mt-0.5 truncate" style={{ color: '#8888A0' }}>
+                    {engineerRec.rationale}
+                  </p>
+                )}
+                {engineerRec?.compound && (
+                  <p className="text-xs mt-1" style={{ color: '#F0F0F5' }}>
+                    Recommended compound:{' '}
+                    <span className="font-semibold" style={{ color: recBorderColor }}>
+                      {engineerRec.compound}
+                    </span>
+                  </p>
+                )}
+              </div>
+              {engineerRec?.action === 'PIT_NOW' && (
+                <button
+                  onClick={handlePitNow}
+                  className="shrink-0 px-3 py-1.5 rounded text-xs font-semibold transition-colors"
+                  style={{
+                    backgroundColor: recBorderColor,
+                    color: '#0F0F14',
+                  }}
+                >
+                  PIT NOW
+                </button>
+              )}
             </div>
           </motion.div>
         </div>
