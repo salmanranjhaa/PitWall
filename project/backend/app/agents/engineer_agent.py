@@ -87,8 +87,10 @@ class RaceEngineerAgent:
         self.desires: list[Desire] = []
         self._desire_set = DesireSet()
 
-    def perceive(self, player_number: int, race_state: Any) -> None:
-        self.beliefs.update_from_state(player_number, race_state, race_state.track)
+    def perceive(self, player_number: int, race_state: Any, track=None) -> None:
+        self.beliefs.update_from_state(
+            player_number, race_state, track or getattr(race_state, "track", None)
+        )
 
     def deliberate(self) -> None:
         self.desires = self._desire_set.deliberate(

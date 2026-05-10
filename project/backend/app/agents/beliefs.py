@@ -7,8 +7,8 @@ Updated at the start of each lap from CarState and RaceState.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 
-from ..simulation.ai_opponents import AIOpponentController
-from ..simulation.tracks import Track
+from simulation.ai_opponents import AIOpponentController
+from simulation.tracks import Track
 
 
 # Reuse physics constants from the existing AI controller

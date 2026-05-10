@@ -21,8 +21,8 @@ from .weather import WeatherState, WeatherSystem
 from .ai_opponents import (
     Driver, AIOpponentController, DRIVER_DATABASE, TEAM_BASE_PACE,
 )
-from ..agents.driver_agent import DriverAgent, AgentAction
-from ..agents.engineer_agent import RaceEngineerAgent
+from agents.driver_agent import DriverAgent, AgentAction
+from agents.engineer_agent import RaceEngineerAgent
 from .events import (
     RaceEventBus, RaceEvent, SafetyCarController, FlagState, Incident,
 )
@@ -859,7 +859,7 @@ class RaceEngine:
                 continue
 
             # BDI cycle
-            agent.perceive(race_state)
+            agent.perceive(race_state, self.track)
             agent.deliberate()
             agent.select_plan()
             action: AgentAction = agent.execute()
@@ -994,7 +994,7 @@ class RaceEngine:
 
     def _run_engineer_cycle(self) -> None:
         """Update the race engineer agent and store its recommendation."""
-        self._engineer_agent.perceive(self._player_car.driver.number, self.get_state())
+        self._engineer_agent.perceive(self._player_car.driver.number, self.get_state(), self.track)
         self._engineer_agent.deliberate()
         rec = self._engineer_agent.recommend()
         self._engineer_recommendation = {

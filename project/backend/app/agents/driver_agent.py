@@ -17,7 +17,7 @@ from .beliefs import BeliefBase, SelfBelief, TireBelief, RaceContextBelief
 from .desires import Desire, DesireSet
 from .plans import Plan, PlanName, PlanStep, PlanLibrary
 from .personality import Personality, PlanSelector, get_personality
-from ..simulation.ai_opponents import Driver
+from simulation.ai_opponents import Driver
 
 
 @dataclass
@@ -84,9 +84,11 @@ class DriverAgent(BDIAgent):
 
     # ── BDI cycle ────────────────────────────────────────────────────
 
-    def perceive(self, race_state: Any) -> None:
+    def perceive(self, race_state: Any, track=None) -> None:
         """Step 1: Update belief base from race state."""
-        self.beliefs.update_from_state(self.driver.number, race_state, race_state.track)
+        self.beliefs.update_from_state(
+            self.driver.number, race_state, track or getattr(race_state, "track", None)
+        )
 
     def deliberate(self) -> None:
         """Step 2: Rank desires given current beliefs."""
