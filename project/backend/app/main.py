@@ -1,5 +1,5 @@
 """
-Scuderia F1 Strategy Simulator API
+Pitwall F1 Strategy Simulator API
 
 FastAPI entry point that assembles all routers and configures CORS
 for frontend communication.
@@ -23,7 +23,7 @@ from routers import race, strategy, weather, data, qualify
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Scuderia F1 Strategy Simulator API",
+        title="Pitwall F1 Strategy Simulator API",
         description="ML-powered race strategy simulation backend with tire degradation models, "
                     "lap time prediction, Monte Carlo strategy optimization, and real-time race state management.",
         version="2.0.0",
@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
     @app.get("/", include_in_schema=False)
     def root():
         return {
-            "service": "Scuderia F1 Strategy Simulator API",
+            "service": "Pitwall F1 Strategy Simulator API",
             "version": "2.0.0",
             "docs": "/docs",
             "health": "/health",
