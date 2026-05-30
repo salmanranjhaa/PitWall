@@ -162,6 +162,14 @@ class WeatherSystem:
         self.race_month = max(1, min(12, race_month))
         self._rng = random.Random(random_seed)
         self._seasonal_rain_prob = track.rain_probability.get(self.race_month, 0.1)
+        try:
+            from .weather_lstm import LSTMWeatherForecaster
+            self._lstm_forecaster = LSTMWeatherForecaster(
+                seasonal_rain_probability=self._seasonal_rain_prob,
+                random_seed=random_seed,
+            )
+        except Exception:
+            self._lstm_forecaster = None
 
     def initialize(self) -> WeatherState:
         """
@@ -245,18 +253,36 @@ class WeatherSystem:
         Returns:
             Updated WeatherState after one lap.
         """
+        return self._advance_with_rng(current, self._rng)
+
+    def _advance_with_rng(self, current: WeatherState, rng: random.Random) -> WeatherState:
+        """Advance weather with an injected RNG so forecasts do not mutate race RNG."""
         # Determine next condition using Markov chain
         transitions = TRANSITION_MATRIX[current.condition]
 
-        roll = self._rng.random()
+        # Scale off-diagonal transitions by the track's seasonal rain probability.
+        # The base matrix assumes an average "wet capable" climate.
+        # For a track with 0.02 rain probability, transitions away from DRY become near 0.
+        rain_scale = min(1.0, self._seasonal_rain_prob / 0.15) # Normalize against a 15% baseline
+
+        roll = rng.random()
         cumulative = 0.0
         next_condition = current.condition  # Default: stay the same
 
         for condition, prob in transitions.items():
-            cumulative += prob
+            if condition == current.condition:
+                continue # Handle the stay-same probability last
+            
+            # Scale the chance to change condition
+            scaled_prob = prob * rain_scale if current.condition == "DRY" else prob
+            cumulative += scaled_prob
             if roll <= cumulative:
                 next_condition = condition
                 break
+        
+        # If no transition triggered, stay in current state
+        if next_condition == current.condition:
+             pass
 
         # Handle HEAVY_RAIN thunderstorm absorption (20% -> stay heavy)
         if current.condition == "HEAVY_RAIN" and roll > 0.8:
@@ -275,20 +301,20 @@ class WeatherSystem:
         # Temperature evolution
         if next_condition == "DRY":
             # Track warms up in dry conditions
-            new_state.track_temp += 0.3 + self._rng.gauss(0, 0.2)
-            new_state.air_temp += self._rng.gauss(0, 0.3)
+            new_state.track_temp += 0.3 + rng.gauss(0, 0.2)
+            new_state.air_temp += rng.gauss(0, 0.3)
             new_state.humidity = max(20.0, new_state.humidity - 0.5)
         elif next_condition in ("LIGHT_RAIN", "HEAVY_RAIN"):
             # Rain cools everything down
-            new_state.track_temp -= 0.5 + self._rng.gauss(0, 0.2)
-            new_state.air_temp -= 0.2 + self._rng.gauss(0, 0.1)
+            new_state.track_temp -= 0.5 + rng.gauss(0, 0.2)
+            new_state.air_temp -= 0.2 + rng.gauss(0, 0.1)
             new_state.humidity = min(100.0, new_state.humidity + 1.0)
         else:  # DRIZZLE
-            new_state.track_temp -= 0.1 + self._rng.gauss(0, 0.1)
+            new_state.track_temp -= 0.1 + rng.gauss(0, 0.1)
             new_state.humidity = min(100.0, new_state.humidity + 0.3)
 
         # Wind speed varies randomly
-        new_state.wind_speed = max(0.0, new_state.wind_speed + self._rng.gauss(0, 2))
+        new_state.wind_speed = max(0.0, new_state.wind_speed + rng.gauss(0, 2))
 
         # Clamp all values
         new_state.air_temp = round(max(5.0, min(45.0, new_state.air_temp)), 1)
@@ -313,15 +339,22 @@ class WeatherSystem:
         Returns:
             List of WeatherState objects representing the predicted path.
         """
-        # Run multiple Monte Carlo simulations and average
+        # Run multiple Monte Carlo simulations and average. Each simulation uses
+        # its own RNG so asking for a forecast cannot alter the real race weather.
         num_simulations = 50
         all_paths: List[List[WeatherState]] = []
 
-        for _ in range(num_simulations):
+        for sim_idx in range(num_simulations):
+            sim_rng = random.Random(
+                int(self._seasonal_rain_prob * 10000)
+                + sim_idx * 997
+                + int(current.track_dampness * 1000)
+                + int(current.rain_intensity * 100)
+            )
             path = []
             state = current.copy()
             for _ in range(laps):
-                state = self.advance(state)
+                state = self._advance_with_rng(state, sim_rng)
                 path.append(state.copy())
             all_paths.append(path)
 
@@ -349,7 +382,44 @@ class WeatherSystem:
                 wind_speed=round(avg_wind, 1),
             ))
 
+        if self._lstm_forecaster is not None:
+            try:
+                lstm_path = self._lstm_forecaster.forecast(current, laps)
+                forecast = self._blend_forecasts(forecast, lstm_path)
+            except Exception:
+                pass
+
         return forecast
+
+    def _blend_forecasts(
+        self,
+        markov_path: List[WeatherState],
+        lstm_path: List[WeatherState],
+    ) -> List[WeatherState]:
+        """Blend Markov uncertainty with the recurrent LSTM-style forecast."""
+        blended: List[WeatherState] = []
+        for markov, lstm in zip(markov_path, lstm_path):
+            rain = (markov.rain_intensity * 0.45) + (lstm.rain_intensity * 0.55)
+            dampness = (markov.track_dampness * 0.45) + (lstm.track_dampness * 0.55)
+            if dampness < CROSSOVER_SLICK_MAX and rain < 0.12:
+                condition = "DRY"
+            elif dampness < CROSSOVER_INTER_MIN and rain < 0.30:
+                condition = "DRIZZLE"
+            elif dampness < CROSSOVER_WET_MIN and rain < 0.70:
+                condition = "LIGHT_RAIN"
+            else:
+                condition = "HEAVY_RAIN"
+
+            blended.append(WeatherState(
+                condition=condition,
+                air_temp=round((markov.air_temp * 0.50) + (lstm.air_temp * 0.50), 1),
+                track_temp=round((markov.track_temp * 0.50) + (lstm.track_temp * 0.50), 1),
+                humidity=round((markov.humidity * 0.45) + (lstm.humidity * 0.55), 1),
+                rain_intensity=round(rain, 3),
+                track_dampness=round(dampness, 3),
+                wind_speed=round((markov.wind_speed * 0.55) + (lstm.wind_speed * 0.45), 1),
+            ))
+        return blended
 
     def tire_crossover_point(self, weather: WeatherState) -> str:
         """

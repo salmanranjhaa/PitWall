@@ -17,6 +17,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import race, strategy, weather, data, qualify
 
 # ---------------------------------------------------------------------------
+# CORS — driven by environment variable for production safety
+# ---------------------------------------------------------------------------
+_DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
+
+def _get_allowed_origins() -> list[str]:
+    """
+    Read comma-separated allowed origins from ALLOWED_ORIGINS env var.
+    Falls back to localhost dev defaults if the variable is not set.
+
+    Example .env:
+        ALLOWED_ORIGINS=https://your-app.vercel.app,http://localhost:3000
+    """
+    raw = os.environ.get("ALLOWED_ORIGINS", "")
+    if raw.strip():
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    return _DEFAULT_ORIGINS
+
+# ---------------------------------------------------------------------------
 # Application factory
 # ---------------------------------------------------------------------------
 
@@ -31,13 +52,13 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # CORS middleware for frontend communication
+    # CORS middleware — origins restricted via ALLOWED_ORIGINS env var
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_get_allowed_origins(),
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "Accept"],
     )
 
     # Register routers

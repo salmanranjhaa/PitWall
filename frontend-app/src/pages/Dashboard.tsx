@@ -15,6 +15,7 @@ import {
 import {
   streamAutoRace, playerPit,
   type RaceState, type CarStateApi, type RaceEventEntry, type StrategyMsg,
+  type BDIState, type EngineerRecommendation,
 } from "@/services/api";
 import TrackMap from "@/components/TrackMap";
 
@@ -694,8 +695,14 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceState?.flag, raceState?.phase]);
 
-  // Compute pit recommendation for the SC notification
+  // Engineer recommendation from BDI race-engineer agent
+  const engineerRec: EngineerRecommendation | null = raceState?.engineer_recommendation ?? null;
+
+  // Derive SC notification recommendation from engineer agent (fallback to inline logic)
   const scRecommendation = useMemo(() => {
+    if (engineerRec?.compound) {
+      return { compound: engineerRec.compound, reason: engineerRec.rationale };
+    }
     if (!player) return { compound: "MEDIUM", reason: "SC window — standard pit opportunity" };
     if (isRaining) return { compound: "INTERMEDIATE", reason: "Wet track — switch to intermediates" };
     const wear = player.tire.wear;
@@ -707,7 +714,7 @@ export default function Dashboard() {
     if (compoundsUsed.size < 2 && unusedDry) return { compound: unusedDry, reason: `Compound obligation — must use ${unusedDry} before finish` };
     if (lapsLeft2 > 20) return { compound: "MEDIUM", reason: "SC window: extend strategy, protect tires for final push" };
     return { compound: "SOFT", reason: "Final stint — attack on fresh softs" };
-  }, [raceState?.flag, raceState?.phase, player, isRaining, compoundsUsed, compound, currentLap, totalLaps]);
+  }, [engineerRec, raceState?.flag, raceState?.phase, player, isRaining, compoundsUsed, compound, currentLap, totalLaps]);
 
   const handlePitNow = async () => {
     if (sessionId === "mock" || !raceState || isPitting) return;
@@ -1072,6 +1079,32 @@ export default function Dashboard() {
                   <span className="text-text-primary font-mono font-semibold">{player?.fuel?.toFixed(1) ?? "--"} kg</span>
                 </div>
               </div>
+
+              {/* BDI Debug Panel (dev-only) */}
+              {import.meta.env.DEV && raceState?.bdi_states && (
+                <div className="mt-3 pt-3 border-t border-border-subtle/50">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-text-ghost mb-1.5">
+                    BDI Debug
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                    {Object.values(raceState.bdi_states).map((state: BDIState) => (
+                      <div
+                        key={state.driver_number}
+                        className="text-[9px] p-1.5 rounded bg-carbon border border-border-subtle/40"
+                      >
+                        <span className="font-semibold text-text-primary">#{state.driver_number}</span>{" "}
+                        <span className="text-ferrari-gold">{state.top_desire ?? "—"}</span>
+                        <div className="text-text-ghost truncate">
+                          {state.current_plan ?? "NO_PLAN"} | s{state.plan_step}
+                        </div>
+                        {state.tire_degrading_faster && (
+                          <span className="text-alert-red">deg+</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tire Status */}
@@ -1258,7 +1291,42 @@ export default function Dashboard() {
               <div className="p-3 space-y-2 max-h-44 overflow-y-auto">
                 {msgTab === "DRIVER" && (
                   <>
-                    {stratMsgs.length === 0 && (
+                    {/* BDI Engineer recommendation (non-SC) */}
+                    {engineerRec && engineerRec.priority !== "INFO" && raceState?.flag !== "SAFETY_CAR" && raceState?.phase !== "SAFETY_CAR" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`border rounded-lg p-2.5 ${
+                          engineerRec.priority === "URGENT"
+                            ? "bg-alert-red/10 border-alert-red/40"
+                            : "bg-emerald-500/10 border-emerald-500/30"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <Headphones className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-neural-purple" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-neural-purple mb-0.5">
+                              Engineer — {engineerRec.priority}
+                            </p>
+                            <p className="text-xs text-text-primary font-semibold truncate">
+                              {engineerRec.headline}
+                            </p>
+                            <p className="text-[10px] text-text-ghost mt-0.5">
+                              {engineerRec.rationale}
+                            </p>
+                            {engineerRec.action === "PIT_NOW" && engineerRec.compound && (
+                              <button
+                                onClick={() => handleSCPit(engineerRec.compound!)}
+                                className="mt-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-alert-red/15 border border-alert-red/40 text-alert-red hover:bg-alert-red/25 transition-colors"
+                              >
+                                Pit — {engineerRec.compound}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    {stratMsgs.length === 0 && !engineerRec && (
                       <p className="text-xs text-text-ghost text-center py-4">No strategy messages yet</p>
                     )}
                     {/* Filter SC/VSC URGENT pit messages — those surface via the SC popup instead */}

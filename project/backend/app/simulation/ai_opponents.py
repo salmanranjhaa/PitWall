@@ -518,8 +518,8 @@ class AIOpponentController:
         if race_state is None or race_state.lap <= 0:
             return None
 
-        # Base incident probability per lap
-        base_prob = self.track.sc_probability * 0.008  # Scale to per-lap
+        # Base incident probability per lap (significantly increased for realism)
+        base_prob = self.track.sc_probability * 0.04  # Scale to per-lap
 
         # Weather multiplier
         weather = race_state.weather
@@ -571,15 +571,17 @@ class AIOpponentController:
                 severity = "critical"
                 description = f"{driver.name} has a major crash — car stopped on track"
 
-                return {
-                    "driver": driver,
-                    "driver_number": driver.number,
-                    "severity": severity,
-                    "description": description,
-                    "lap": race_state.lap,
-                    "requires_sc": severity in ("major", "critical"),
-                    "sector": self._rng.randint(1, 3),
-                }
+            return {
+                "driver_number": driver.number,
+                "driver_name": driver.name,
+                "severity": severity,
+                "description": description,
+                "lap": race_state.lap,
+                "requires_sc": severity in ("major", "critical"),
+                "requires_red": severity == "critical" and self._rng.random() < 0.35,
+                "sector": self._rng.randint(1, 3),
+                "processed": False,
+            }
 
         return None
 

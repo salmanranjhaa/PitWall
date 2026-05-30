@@ -18,9 +18,12 @@ import numpy as np
 from .tracks import Track, get_track
 from .physics import CarPhysics, BlendedLapTimeEngine, TIRE_COMPOUNDS
 from .weather import WeatherState, WeatherSystem
+from .sector import SectorSimulator
 from .ai_opponents import (
     Driver, AIOpponentController, DRIVER_DATABASE, TEAM_BASE_PACE,
 )
+from agents.driver_agent import DriverAgent, AgentAction
+from agents.engineer_agent import RaceEngineerAgent
 from .events import (
     RaceEventBus, RaceEvent, SafetyCarController, FlagState, Incident,
 )
@@ -96,6 +99,8 @@ class CarState:
     track_limit_violations: int = 0   # cumulative track limits count
     contact_penalties: int = 0        # cumulative contact penalty count
     pending_time_penalty: float = 0.0 # seconds to add at next pit stop (stewarding decision)
+    sector_times: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    last_sector: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize car state to a dictionary."""
@@ -122,6 +127,8 @@ class CarState:
             "track_limit_violations": self.track_limit_violations,
             "contact_penalties": self.contact_penalties,
             "pending_time_penalty": round(self.pending_time_penalty, 1),
+            "sector_times": [round(s, 3) for s in self.sector_times],
+            "last_sector": self.last_sector,
         }
 
 
@@ -178,6 +185,11 @@ class RaceState:
     flag: FlagState = FlagState.GREEN
     incidents: List[Dict[str, Any]] = field(default_factory=list)
     events_log: List[Dict[str, Any]] = field(default_factory=list)
+    bdi_states: Dict[int, dict] = field(default_factory=dict)
+    engineer_recommendation: Dict[str, Any] = field(default_factory=dict)
+    weather_forecast: List[Dict[str, Any]] = field(default_factory=list)
+    sector_flags: Dict[int, str] = field(default_factory=lambda: {1: "GREEN", 2: "GREEN", 3: "GREEN"})
+    race_control: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize race state to a dictionary."""
@@ -197,7 +209,7 @@ class RaceState:
 
         messages_list = [m.to_dict() for m in self.messages]
 
-        return {
+        result = {
             "lap": self.lap,
             "total_laps": self.total_laps,
             "status": self.status,
@@ -208,10 +220,18 @@ class RaceState:
             "flag": self.flag.name,
             "incidents": self.incidents,
             "events_log": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.events_log[-15:]],
+            "weather_forecast": self.weather_forecast,
+            "sector_flags": self.sector_flags,
+            "race_control": self.race_control,
             # Frontend compatibility aliases
             "current_lap": self.lap,
             "strategy_messages": messages_list,
         }
+        if self.bdi_states:
+            result["bdi_states"] = self.bdi_states
+        if self.engineer_recommendation:
+            result["engineer_recommendation"] = self.engineer_recommendation
+        return result
 
 
 # =============================================================================
@@ -274,6 +294,7 @@ class RaceEngine:
         self._weather_system = WeatherSystem(track, race_month, random_seed)
         self._event_bus = RaceEventBus()
         self._sc_controller = SafetyCarController(random_seed)
+        self._sector_simulator = SectorSimulator(track, random_seed)
 
         # Race state
         self._state: RaceState = RaceState()
@@ -286,6 +307,8 @@ class RaceEngine:
         # Tracks the last lap on which a given (attacker_number, defender_number) pair overtook.
         # Prevents the same two cars from trading places every single lap.
         self._overtake_cooldown: Dict[Tuple[int, int], int] = {}
+        self._sector_flag_ttl: Dict[int, int] = {}
+        self._last_ai_pit_lap: Dict[int, int] = {}
 
     # -------------------------------------------------------------------------
     # RACE LIFECYCLE
@@ -437,12 +460,28 @@ class RaceEngine:
         if self._player_car is None:
             self._player_car = self._cars[0]
 
-        # Initialize AI controller
+        # Initialize AI controller (kept for incident generation + overtake probability)
         self._ai_controller = AIOpponentController(
             drivers=[c.driver for c in self._cars if c.driver.team != self.player_team],
             track=self.track,
             random_seed=self._seed,
         )
+
+        # Create one BDI DriverAgent per AI car
+        self._driver_agents: Dict[int, DriverAgent] = {}
+        for car in self._cars:
+            if car.driver.number != self._player_car.driver.number:
+                self._driver_agents[car.driver.number] = DriverAgent(
+                    driver=car.driver,
+                    rng=self._rng,
+                )
+
+        # Race engineer agent for player recommendations
+        self._engineer_agent = RaceEngineerAgent()
+
+        # Store last BDI state for API serialisation
+        self._bdi_states: Dict[int, dict] = {}
+        self._engineer_recommendation: Dict[str, Any] = {}
 
         # Build initial state
         self._state = RaceState(
@@ -456,7 +495,10 @@ class RaceEngine:
             flag=FlagState.GREEN,
             incidents=[],
             events_log=[],
+            sector_flags=self._current_sector_flags(),
+            race_control=self._race_control_payload(),
         )
+        self._update_weather_forecast()
 
         self._current_lap = 0
         self._race_finished = False
@@ -501,38 +543,53 @@ class RaceEngine:
             return self._state
 
         actions = actions or {}
+
+        if self._sc_controller.is_red_active or self._state.flag == FlagState.RED:
+            return self._advance_red_flag_period(actions)
+
         self._current_lap += 1
         self._state.lap = self._current_lap
+        self._state.sector_flags = self._current_sector_flags()
 
         # 1. Update weather
         if self._state.weather:
             self._state.weather = self._weather_system.advance(self._state.weather)
+            self._update_weather_forecast()
 
         # 2. Process player actions
         if "ers_mode" in actions and self._player_car:
             self._player_car.ers_mode = actions["ers_mode"]
 
-        # 3. Calculate lap times for all cars
-        self._calculate_lap_times()
+        # Reset per-lap agent modifiers
+        for car in self._cars:
+            car._pace_multiplier = 1.0  # type: ignore[attr-defined]
+            car._tire_wear_multiplier = 1.0  # type: ignore[attr-defined]
+            car._defending = False      # type: ignore[attr-defined]
 
-        # 4. Update positions based on cumulative times
+        # 3. Run BDI agent cycle before lap-time calculation so pace, pit, and
+        # defensive actions affect this lap.
+        self._update_gaps()
+        self._run_agent_cycle()
+
+        # 4. Calculate lap times for all cars
+        self._calculate_lap_times()
+        self._tick_sector_flags()
+
+        # 5. Update positions based on cumulative times
         self._update_positions()
 
-        # 5. Update gaps FIRST so pit decisions and overtakes use fresh gap data
+        # 6. Update gaps after lap-time calculation
         self._update_gaps()
 
-        # 6. Process AI pit decisions (uses fresh gaps from step 5)
-        self._process_ai_pit_decisions()
-
-        # 7. Process overtakes (uses fresh gaps from step 5)
-        self._process_overtakes()
+        # 7. Run race engineer cycle for player recommendations
+        self._run_engineer_cycle()
 
         # 8. Check and generate incidents
         self._check_incidents()
 
         # 9. Update safety car status — emit flag-change events to events_log
         prev_flag = self._state.flag
-        self._sc_controller.check_incident(self._state)
+        triggered_control_incident = self._sc_controller.check_incident(self._state)
         new_flag = self._sc_controller.get_flag_state()
         self._state.flag = new_flag
         self._sc_controller.tick()
@@ -553,7 +610,23 @@ class RaceEngine:
                     "lap": self._current_lap,
                     "data": {"message": "Virtual Safety Car"},
                 })
-            elif prev_flag in (FlagState.SAFETY_CAR, FlagState.VSC) and new_flag == FlagState.GREEN:
+            elif new_flag == FlagState.RED:
+                self._state.events_log.append({
+                    "event_type": "red_flag",
+                    "lap": self._current_lap,
+                    "data": {
+                        "laps_remaining": self._sc_controller.red_laps_remaining,
+                        "message": "Red flag - race stopped",
+                        "incident": triggered_control_incident,
+                    },
+                })
+                self._state.messages.append(StrategyMessage(
+                    msg_type="URGENT",
+                    text="Red flag - race stopped. Cars return to the pit lane.",
+                    confidence=1.0,
+                    trigger_lap=self._current_lap,
+                ))
+            elif prev_flag in (FlagState.SAFETY_CAR, FlagState.VSC, FlagState.RED) and new_flag == FlagState.GREEN:
                 self._state.events_log.append({
                     "event_type": "green_flag",
                     "lap": self._current_lap,
@@ -591,6 +664,12 @@ class RaceEngine:
 
         self._state.player = self._player_car
 
+        # Attach BDI state to RaceState for API serialization
+        self._state.bdi_states = self._bdi_states
+        self._state.engineer_recommendation = self._engineer_recommendation
+        self._state.sector_flags = self._current_sector_flags()
+        self._state.race_control = self._race_control_payload()
+
         return self._state
 
     def player_pit(self, compound: str) -> RaceState:
@@ -607,7 +686,8 @@ class RaceEngine:
             return self._state
 
         # Apply pit stop time loss + any pending steward penalties
-        pit_time = self.track.pit_loss_time + self._player_car.pending_time_penalty
+        base_pit_loss = 0.0 if self._state.flag == FlagState.RED else self.track.pit_loss_time
+        pit_time = base_pit_loss + self._player_car.pending_time_penalty
         self._player_car.total_time += pit_time
         served_penalty = self._player_car.pending_time_penalty
         self._player_car.pending_time_penalty = 0.0
@@ -684,6 +764,102 @@ class RaceEngine:
         """
         return self._state
 
+    def _advance_red_flag_period(self, actions: Optional[Dict[str, Any]] = None) -> RaceState:
+        """Advance a red flag suspension tick without completing a race lap."""
+        actions = actions or {}
+        if "ers_mode" in actions and self._player_car:
+            self._player_car.ers_mode = actions["ers_mode"]
+
+        self._state.flag = FlagState.RED
+        self._state.race_control = self._race_control_payload()
+        self._state.events_log.append({
+            "event_type": "red_flag_suspended",
+            "lap": self._current_lap,
+            "data": {
+                "laps_remaining": self._sc_controller.red_laps_remaining,
+                "message": "Race remains stopped under red flag",
+            },
+        })
+
+        for car in self._cars:
+            if car.alive and not car.finished:
+                car.ers_battery = min(self.ERS_MAX_BATTERY, car.ers_battery + 25.0)
+
+        self._sc_controller.tick()
+
+        if not self._sc_controller.is_red_active:
+            self._state.flag = FlagState.GREEN
+            self._state.events_log.append({
+                "event_type": "red_flag_restart",
+                "lap": self._current_lap,
+                "data": {"message": "Race control has restarted the race"},
+            })
+            self._state.messages.append(StrategyMessage(
+                msg_type="INFO",
+                text="Race restart confirmed - green flag next lap.",
+                confidence=1.0,
+                trigger_lap=self._current_lap,
+            ))
+
+        self._state.leaderboard = list(self._state.leaderboard)
+        self._state.player = self._player_car
+        self._state.bdi_states = self._bdi_states
+        self._state.engineer_recommendation = self._engineer_recommendation
+        self._state.sector_flags = self._current_sector_flags()
+        self._state.race_control = self._race_control_payload()
+        return self._state
+
+    def _update_weather_forecast(self, laps: int = 10) -> None:
+        """Cache a forecast snapshot on the race state for BDI and API clients."""
+        if self._state.weather is None:
+            self._state.weather_forecast = []
+            return
+        forecast = self._weather_system.get_forecast(self._state.weather, laps)
+        self._state.weather_forecast = [
+            {
+                "lap": self._current_lap + i + 1,
+                "condition": f.condition,
+                "air_temp": f.air_temp,
+                "track_temp": f.track_temp,
+                "humidity": f.humidity,
+                "rain_intensity": f.rain_intensity,
+                "rain_probability": f.rain_intensity,
+                "track_dampness": f.track_dampness,
+                "wind_speed": f.wind_speed,
+                "is_raining": f.rain_intensity > 0.05,
+            }
+            for i, f in enumerate(forecast)
+        ]
+
+    def _current_sector_flags(self) -> Dict[int, str]:
+        """Return active local sector flags."""
+        return {
+            1: "YELLOW" if self._sector_flag_ttl.get(1, 0) > 0 else "GREEN",
+            2: "YELLOW" if self._sector_flag_ttl.get(2, 0) > 0 else "GREEN",
+            3: "YELLOW" if self._sector_flag_ttl.get(3, 0) > 0 else "GREEN",
+        }
+
+    def _set_sector_flag(self, sector: int, duration: int = 1) -> None:
+        """Set a local yellow flag for a sector."""
+        if 1 <= sector <= 3:
+            self._sector_flag_ttl[sector] = max(self._sector_flag_ttl.get(sector, 0), duration)
+
+    def _tick_sector_flags(self) -> None:
+        """Decrement local sector flag timers after they have affected a lap."""
+        for sector in list(self._sector_flag_ttl.keys()):
+            self._sector_flag_ttl[sector] -= 1
+            if self._sector_flag_ttl[sector] <= 0:
+                del self._sector_flag_ttl[sector]
+
+    def _race_control_payload(self) -> Dict[str, Any]:
+        """Serialize race-control timers."""
+        return {
+            "flag": self._state.flag.name if hasattr(self._state.flag, "name") else str(self._state.flag),
+            "safety_car_laps_remaining": self._sc_controller.sc_laps_remaining,
+            "vsc_laps_remaining": self._sc_controller.vsc_laps_remaining,
+            "red_flag_laps_remaining": self._sc_controller.red_laps_remaining,
+        }
+
     # -------------------------------------------------------------------------
     # INTERNAL METHODS
     # -------------------------------------------------------------------------
@@ -747,6 +923,21 @@ class RaceEngine:
             elif self._state.flag == FlagState.VSC:
                 lap_time *= 1.12  # ~12% slower under VSC
 
+            # Apply agent pace multiplier
+            if hasattr(car, '_pace_multiplier') and car._pace_multiplier != 1.0:
+                lap_time *= car._pace_multiplier
+
+            sector_times = self._sector_simulator.split_lap(
+                lap_time=lap_time,
+                car=car,
+                weather=self._state.weather,
+                flag=self._state.flag,
+                sector_flags=self._current_sector_flags(),
+            )
+            lap_time = sum(sector_times)
+
+            car.sector_times = sector_times
+            car.last_sector = 3
             car.lap_time = max(lap_time, self.track.reference_lap_times.get(car.tire.compound, 90.0) * 0.90)
             car.total_time += car.lap_time
             car.tire.age += 1
@@ -794,7 +985,8 @@ class RaceEngine:
             # Update tire wear
             compound_data = TIRE_COMPOUNDS.get(car.tire.compound)
             if compound_data:
-                wear_rate = 1.0 / compound_data.stint_limit
+                wear_mult = getattr(car, "_tire_wear_multiplier", 1.0)
+                wear_rate = (1.0 / compound_data.stint_limit) * wear_mult
                 car.tire.wear = min(1.0, car.tire.wear + wear_rate + self._rng.gauss(0, 0.02))
 
     def _update_positions(self) -> None:
@@ -811,7 +1003,191 @@ class RaceEngine:
         for i, car in enumerate(alive_cars, 1):
             car.position = i
 
-    def _process_ai_pit_decisions(self) -> None:
+    def _run_agent_cycle(self) -> None:
+        """Run one BDI tick for all AI driver agents."""
+        race_state = self.get_state()
+
+        for driver_number, agent in self._driver_agents.items():
+            car = self._get_car(driver_number)
+            if car is None or not car.alive or car.finished:
+                continue
+
+            # BDI cycle
+            agent.perceive(race_state, self.track)
+            agent.deliberate()
+            agent.select_plan()
+            action: AgentAction = agent.execute()
+
+            # Store BDI state for API
+            self._bdi_states[driver_number] = agent.bdi_state()
+
+            # Apply action to simulation
+            self._apply_agent_action(car, action)
+
+    def _apply_agent_action(self, car: CarState, action: AgentAction) -> None:
+        """
+        Translate an AgentAction into simulation effects.
+        This is the bridge between BDI output and physics engine.
+        """
+        if action.action_type == "PIT":
+            # Queue a pit stop (same path as player pit but for AI)
+            self._execute_ai_pit(car, action.compound)
+
+        elif action.action_type == "PUSH":
+            # Increase lap pace — intensity > 1.0 adds time risk
+            car._pace_multiplier = max(0.96, 1.0 - max(0.0, action.intensity - 1.0) * 0.35)  # type: ignore[attr-defined]
+            car._tire_wear_multiplier = 1.12  # type: ignore[attr-defined]
+
+        elif action.action_type == "MANAGE":
+            # Reduce pace — intensity < 1.0 slows down, saves tires
+            car._pace_multiplier = 1.0 + max(0.0, 1.0 - action.intensity) * 0.25  # type: ignore[attr-defined]
+            car._tire_wear_multiplier = 0.82  # type: ignore[attr-defined]
+
+        elif action.action_type == "ATTACK":
+            # Attempt overtake (calls existing overtake logic)
+            self._attempt_agent_overtake(car, action)
+
+        elif action.action_type == "DEFEND":
+            # Defensive driving — block inside line (increases overtake difficulty)
+            car._defending = True  # type: ignore[attr-defined]
+
+        # NONE: no special action this lap
+
+    def _attempt_agent_overtake(self, attacker: CarState, action: AgentAction) -> None:
+        """Attempt an overtake driven by an agent's ATTACK action."""
+        if self._state.flag != FlagState.GREEN:
+            return
+
+        # Find defender (car immediately ahead)
+        alive_cars = [c for c in self._cars if c.alive and not c.finished]
+        alive_cars.sort(key=lambda c: c.total_time)
+
+        defender = None
+        for i, car in enumerate(alive_cars):
+            if car.driver.number == attacker.driver.number and i > 0:
+                defender = alive_cars[i - 1]
+                break
+
+        if defender is None:
+            return
+
+        gap = attacker.total_time - defender.total_time
+        if gap >= 1.2:
+            return
+
+        # Cooldown: same pair can't fight again too soon
+        COOLDOWN_LAPS = 4
+        pair_key = (attacker.driver.number, defender.driver.number)
+        last_lap = self._overtake_cooldown.get(pair_key, -999)
+        if self._current_lap - last_lap < COOLDOWN_LAPS:
+            return
+
+        # Pace check: attacker must be genuinely faster this lap
+        pace_delta = defender.lap_time - attacker.lap_time
+        drs_ok = attacker.drs_available
+        if pace_delta < 0.15 and not drs_ok:
+            # Failed attempt at close range → possible contact
+            if gap < 0.4 and self._current_lap > 1:
+                self._check_contact(attacker, defender)
+            return
+
+        # Attempt overtake via AI controller probability model
+        success = False
+        if self._ai_controller:
+            # If defender is in DEFEND mode, reduce success probability
+            defend_factor = 0.75 if getattr(defender, '_defending', False) else 1.0
+            raw_success = self._ai_controller.attempt_overtake(
+                attacker.driver, defender.driver, self._state
+            )
+            success = raw_success and self._rng.random() < defend_factor
+
+        if success:
+            overtake_bonus = 0.4 + self._rng.random() * 0.4
+            attacker.total_time = defender.total_time - overtake_bonus
+
+            self._overtake_cooldown[pair_key] = self._current_lap
+            self._overtake_cooldown[(defender.driver.number, attacker.driver.number)] = self._current_lap
+
+            event = RaceEvent(
+                event_type="overtake",
+                lap=self._current_lap,
+                data={
+                    "attacker": attacker.driver.name,
+                    "attacker_number": attacker.driver.number,
+                    "defender": defender.driver.name,
+                    "defender_number": defender.driver.number,
+                },
+            )
+            self._event_bus.emit(event)
+            self._state.events_log.append(event.to_dict())
+        else:
+            if gap < 0.4 and self._current_lap > 1:
+                self._check_contact(attacker, defender)
+
+    def _execute_ai_pit(self, car: CarState, compound: Optional[str]) -> None:
+        """Execute a pit stop for an AI car driven by agent action."""
+        if not car.alive or car.finished:
+            return
+        last_pit_lap = self._last_ai_pit_lap.get(car.driver.number, -999)
+        if self._current_lap - last_pit_lap < 3:
+            return
+        if car.tire.age < 3 and car.pits > 0:
+            wet_track = self._state.weather and self._state.weather.track_dampness > 0.18
+            wrong_weather_tire = (
+                wet_track and car.tire.compound in ("SOFT", "MEDIUM", "HARD")
+            ) or (
+                not wet_track and car.tire.compound in ("INTERMEDIATE", "WET")
+            )
+            if not wrong_weather_tire:
+                return
+        compound = compound or "MEDIUM"
+        pit_time = (0.0 if self._state.flag == FlagState.RED else self.track.pit_loss_time) + car.pending_time_penalty
+        car.total_time += pit_time
+        car.pending_time_penalty = 0.0
+        car.tire = TireState(compound=compound, age=0, wear=0.0)
+        car.pits += 1
+        self._last_ai_pit_lap[car.driver.number] = self._current_lap
+
+        event = RaceEvent(
+            event_type="pit",
+            lap=self._current_lap,
+            data={
+                "driver": car.driver.name,
+                "driver_number": car.driver.number,
+                "compound": compound,
+                "reason": "agent strategy",
+            },
+        )
+        self._event_bus.emit(event)
+        self._state.events_log.append(event.to_dict())
+
+    def _run_engineer_cycle(self) -> None:
+        """Update the race engineer agent and store its recommendation."""
+        self._engineer_agent.perceive(self._player_car.driver.number, self.get_state(), self.track)
+        self._engineer_agent.deliberate()
+        rec = self._engineer_agent.recommend()
+        self._engineer_recommendation = {
+            "priority": rec.priority,
+            "action": rec.action,
+            "compound": rec.compound,
+            "headline": rec.headline,
+            "rationale": rec.rationale,
+            "confidence": rec.confidence,
+            "pit_window": list(rec.pit_window) if rec.pit_window else None,
+        }
+
+    def _get_car(self, driver_number: int) -> Optional[CarState]:
+        """Find a car by driver number."""
+        for car in self._cars:
+            if car.driver.number == driver_number:
+                return car
+        return None
+
+    # ------------------------------------------------------------------
+    # Legacy methods (archived, not deleted — kept for reference)
+    # ------------------------------------------------------------------
+
+    def _process_ai_pit_decisions_legacy(self) -> None:
         """
         Process pit stop decisions for all AI-controlled cars.
 
@@ -857,7 +1233,7 @@ class RaceEngine:
                 self._event_bus.emit(event)
                 self._state.events_log.append(event.to_dict())
 
-    def _process_overtakes(self) -> None:
+    def _process_overtakes_legacy(self) -> None:
         """
         Process overtaking attempts between adjacent cars.
 
@@ -987,6 +1363,7 @@ class RaceEngine:
             severity = incident.get("severity", "minor")
             if severity in ("moderate", "major", "critical"):
                 sector = incident.get("sector", self._rng.randint(1, 3))
+                self._set_sector_flag(sector, duration=2 if severity in ("major", "critical") else 1)
                 self._state.events_log.append({
                     "event_type": "yellow_flag",
                     "lap": self._current_lap,
@@ -1291,6 +1668,7 @@ class RaceEngine:
             description = f"{car.driver.name} — slow puncture, {penalty:.1f}s time loss."
             severity = "major"
 
+        sector = self._rng.randint(1, 3)
         incident = {
             "event_type": "incident",
             "lap": self._current_lap,
@@ -1300,12 +1678,14 @@ class RaceEngine:
                 "severity": severity,
                 "description": description,
                 "requires_sc": is_blowout,
-                "sector": self._rng.randint(1, 3),
+                "requires_red": is_blowout and self._rng.random() < 0.20,
+                "sector": sector,
                 "processed": False,
             },
         }
         self._state.incidents.append(incident["data"])
         self._state.events_log.append(incident)
+        self._set_sector_flag(sector, duration=2 if is_blowout else 1)
 
         msg_type = "URGENT" if is_blowout else "WARNING"
         self._state.messages.append(StrategyMessage(

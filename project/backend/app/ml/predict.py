@@ -21,6 +21,7 @@ import pandas as pd
 import lightgbm as lgb
 
 from ml.features import TRACK_CHARACTERISTICS, TRACK_KEY_LABELS
+from ml.strategy_mcts import MCTSStrategyPlanner
 
 logger = logging.getLogger(__name__)
 
@@ -267,10 +268,10 @@ class MLPredictor:
     # ------------------------------------------------------------------
     def get_strategy_recommendation(self, race_state: Dict) -> Dict:
         """
-        Get AI strategy recommendation using Monte Carlo simulation.
+        Get AI strategy recommendation using Monte Carlo Tree Search.
 
-        Evaluates ``PIT_NOW`` vs ``STAY_OUT`` by running 1 000 rollouts
-        for each scenario and comparing expected finishing positions.
+        Evaluates pit and stay-out branches with a UCT search tree, then
+        returns the highest-value first action and supporting diagnostics.
 
         Args:
             race_state: Dictionary describing the current race situation.
@@ -283,78 +284,18 @@ class MLPredictor:
                 - reason (str)
                 - messages (list)
         """
-        laps_remaining = max(
-            race_state.get("laps_remaining", 1),
-            race_state.get("total_laps", 50) - race_state.get("current_lap", 1),
+        seed = (
+            int(race_state.get("current_lap", 0)) * 31
+            + int(race_state.get("current_position", 10)) * 7
+            + int(race_state.get("tire_age", 0))
         )
-        current_pos = int(race_state.get("current_position", 1))
-        tire_age = int(race_state.get("tire_age", 0))
-        compound = str(race_state.get("compound", "MEDIUM")).upper()
-        track = self._normalize_track(race_state.get("track_name", "bahrain"))
-        gap_behind = float(race_state.get("gap_to_behind", 5.0))
-
-        # Monte Carlo rollouts
-        n_sims = 1000
-        pit_scores = []
-        stay_scores = []
-
-        for _ in range(n_sims):
-            pit_scores.append(self._simulate_rollout(
-                race_state, action="PIT", track=track, compound=compound
-            ))
-            stay_scores.append(self._simulate_rollout(
-                race_state, action="STAY", track=track, compound=compound
-            ))
-
-        avg_pit = np.mean(pit_scores)
-        avg_stay = np.mean(stay_scores)
-        best = "PIT_NOW" if avg_pit > avg_stay else "STAY_OUT"
-
-        # Confidence from separation of means
-        diff = abs(avg_pit - avg_stay)
-        pooled_std = (np.std(pit_scores) + np.std(stay_scores)) / 2 + 1e-6
-        confidence = min(diff / pooled_std, 1.0)
-
-        # Recommended compound
-        rec_compound = "MEDIUM"
-        if laps_remaining > 25:
-            rec_compound = "HARD"
-        elif laps_remaining < 12:
-            rec_compound = "SOFT"
-
-        # Messages
-        messages = []
-        if tire_age > 15 and compound != "HARD":
-            messages.append({
-                "type": "WARNING",
-                "text": "Tire degradation accelerating -- pit window opening",
-                "confidence": round(confidence, 2),
-            })
-        if gap_behind < 2.0:
-            messages.append({
-                "type": "WARNING",
-                "text": f"Gap to car behind only {gap_behind:.1f}s -- undercut threat",
-                "confidence": round(confidence * 0.9, 2),
-            })
-        messages.append({
-            "type": "INFO",
-            "text": f"{rec_compound} tires optimal for next stint ({max(laps_remaining - 5, 5)}-{laps_remaining} laps)",
-            "confidence": 0.91,
-        })
-
-        reason = "PIT_NOW" if best == "PIT_NOW" else "Continue on current tires"
-        if best == "PIT_NOW":
-            reason = f"Tire wear approaching cliff. P{current_pos + 1 if current_pos < 20 else 20} closing gap."
-
-        return {
-            "recommendation": best,
-            "recommended_compound": rec_compound,
-            "confidence": round(confidence, 2),
-            "reason": reason,
-            "messages": messages,
-            "expected_pit_score": round(float(avg_pit), 4),
-            "expected_stay_score": round(float(avg_stay), 4),
-        }
+        planner = MCTSStrategyPlanner(
+            predictor=self,
+            iterations=int(race_state.get("mcts_iterations", 320)),
+            rollout_depth=int(race_state.get("mcts_rollout_depth", 18)),
+            random_seed=seed,
+        )
+        return planner.recommend(race_state)
 
     def _simulate_rollout(
         self,
