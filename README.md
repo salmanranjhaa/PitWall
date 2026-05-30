@@ -1,4 +1,4 @@
-# Pittstop — F1 Race Strategy Simulator
+# PitWall — F1 Race Strategy Simulator
 
 <div align="center">
 
@@ -19,7 +19,7 @@
 
 ## Overview
 
-Pittstop is a lap-by-lap Formula 1 race strategy simulator that places you in the role of a race engineer. You make real-time decisions — **tire strategy, pit stop timing, ERS deployment** — while competing against 19 AI opponents, each driven by an autonomous **BDI (Belief-Desire-Intention) agent** with a unique personality profile modelled on real 2025 F1 drivers.
+PitWall is a lap-by-lap Formula 1 race strategy simulator that places you in the role of a race engineer. You make real-time decisions — **tire strategy, pit stop timing, ERS deployment** — while competing against 19 AI opponents, each driven by an autonomous **BDI (Belief-Desire-Intention) agent** with a unique personality profile modelled on real 2025 F1 drivers.
 
 The simulation is grounded in:
 - **Real F1 telemetry** via the FastF1 Python library
@@ -53,7 +53,7 @@ The simulation is grounded in:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          PITTSTOP F1 SIM                            │
+│                          PITWALL F1 SIM                            │
 │                                                                     │
 │  ┌─────────────────────────┐   ┌──────────────────────────────┐    │
 │  │        FRONTEND          │   │           BACKEND             │    │
@@ -400,8 +400,8 @@ All endpoints are served at `http://localhost:8000`. Interactive docs: `http://l
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/salmanranjhaa/Pittstop.git
-cd Pittstop
+git clone https://github.com/salmanranjhaa/PitWall.git
+cd PitWall
 ```
 
 ### 2. Backend Setup
@@ -464,7 +464,7 @@ python -m app.ml.train_laptime
 ## Project Structure
 
 ```
-Pittstop/
+PitWall/
 │
 ├── project/
 │   └── backend/                    ← Python FastAPI backend
