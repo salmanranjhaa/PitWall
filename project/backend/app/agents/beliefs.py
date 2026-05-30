@@ -142,6 +142,16 @@ class BeliefBase:
             # If rain is imminent, boost probability
             if weather.condition in ("DRIZZLE", "LIGHT_RAIN", "HEAVY_RAIN"):
                 rain_prob = max(rain_prob, 0.5)
+        forecast = getattr(race_state, "weather_forecast", []) or []
+        if forecast:
+            forecast_rain = []
+            for item in forecast[:10]:
+                if isinstance(item, dict):
+                    forecast_rain.append(float(item.get("rain_probability", item.get("rain_intensity", 0.0)) or 0.0))
+                else:
+                    forecast_rain.append(float(getattr(item, "rain_intensity", 0.0)))
+            if forecast_rain:
+                rain_prob = max(rain_prob, max(forecast_rain))
 
         track_temp = getattr(weather, "track_temp", 25.0) if weather else 25.0
         dampness = getattr(weather, "track_dampness", 0.0) if weather else 0.0
@@ -209,8 +219,8 @@ class BeliefBase:
                 break
         if self_idx is not None and self_idx + 1 < len(sorted_by_pos):
             behind_car = sorted_by_pos[self_idx + 1]
-            # gap_behind = self.total_time - behind.total_time (positive = behind is closer)
-            gap_behind = self_car.total_time - behind_car.total_time
+            # Positive gap means the car behind is that many seconds back.
+            gap_behind = behind_car.total_time - self_car.total_time
 
         # Detect pit stop and update stints
         if self_car.pits > self._prev_self_pits:
@@ -236,7 +246,7 @@ class BeliefBase:
             self.gap_ahead_trend = 0.0
 
         if self._prev_gap_behind is not None and gap_behind is not None:
-            self.gap_behind_trend = gap_behind - self._prev_gap_behind  # positive = behind car closing
+            self.gap_behind_trend = self._prev_gap_behind - gap_behind  # positive = behind car closing
         else:
             self.gap_behind_trend = 0.0
 

@@ -64,6 +64,7 @@ def get_recommendation(session_id: str):
         ],
         "expected_pit_score": rec.get("expected_pit_score", 0),
         "expected_stay_score": rec.get("expected_stay_score", 0),
+        "mcts": rec.get("mcts", {}),
     }
 
 
@@ -186,20 +187,49 @@ def _build_race_state(session_id: str) -> Dict:
         from routers.race import _race_engines
         engine = _race_engines.get(session_id)
         if engine:
-            state = engine.get_state()
+            raw_state = engine.get_state()
+            state = raw_state.to_dict() if hasattr(raw_state, "to_dict") else raw_state
+            player = state.get("player", {}) or {}
+            leaderboard = state.get("leaderboard", []) or []
+            player_number = ((player.get("driver") or {}).get("number"))
+            player_index = next(
+                (i for i, car in enumerate(leaderboard)
+                 if ((car.get("driver") or {}).get("number")) == player_number),
+                None,
+            )
+            gap_to_behind = 5.0
+            if player_index is not None and player_index + 1 < len(leaderboard):
+                behind = leaderboard[player_index + 1]
+                p_gap = player.get("gap_to_leader") or 0.0
+                b_gap = behind.get("gap_to_leader")
+                if b_gap is not None:
+                    gap_to_behind = max(0.0, float(b_gap) - float(p_gap))
+
+            dry_used = []
+            for event in state.get("events_log", []):
+                if event.get("event_type") == "pit":
+                    compound = (event.get("data") or {}).get("compound")
+                    if compound in ("SOFT", "MEDIUM", "HARD"):
+                        dry_used.append(compound)
+            current_compound = ((player.get("tire") or {}).get("compound", "MEDIUM"))
+            if current_compound in ("SOFT", "MEDIUM", "HARD"):
+                dry_used.append(current_compound)
             return {
                 "current_lap": state.get("current_lap", 1),
                 "total_laps": state.get("total_laps", 57),
-                "current_position": state.get("positions", {}).get("PLAYER", 1),
+                "current_position": player.get("position", 1),
                 "laps_remaining": state.get("total_laps", 57) - state.get("current_lap", 1),
-                "tire_age": state.get("player_tire_age", 5),
-                "compound": state.get("player_compound", "MEDIUM"),
-                "gap_to_leader": state.get("gap_to_leader", 0.0),
-                "gap_to_next": state.get("gap_to_next", 2.0),
-                "gap_to_behind": state.get("gap_to_behind", 3.0),
-                "fuel_remaining_kg": state.get("fuel_remaining_kg", 50.0),
-                "track_name": state.get("track_name", "bahrain"),
+                "tire_age": (player.get("tire") or {}).get("age", 5),
+                "compound": current_compound,
+                "pits": player.get("pits", 0),
+                "dry_compounds_used": sorted(set(dry_used)),
+                "gap_to_leader": player.get("gap_to_leader", 0.0),
+                "gap_to_next": player.get("gap_to_next", 2.0),
+                "gap_to_behind": gap_to_behind,
+                "fuel_remaining_kg": player.get("fuel", 50.0),
+                "track_name": getattr(getattr(engine, "track", None), "name", "bahrain"),
                 "weather": state.get("weather", {}),
+                "weather_forecast": state.get("weather_forecast", []),
             }
     except Exception:
         pass

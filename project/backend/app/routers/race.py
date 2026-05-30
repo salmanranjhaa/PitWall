@@ -216,7 +216,7 @@ def set_ers_mode(req: ERSRequest):
     if hasattr(engine, "set_ers_mode"):
         try:
             state = engine.set_ers_mode(req.mode)
-            return {"state": state}
+            return {"state": _serialize(state)}
         except Exception as exc:
             return {"error": str(exc)}
 

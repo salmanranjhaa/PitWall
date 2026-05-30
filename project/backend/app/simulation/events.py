@@ -186,6 +186,13 @@ class SafetyCarController:
         "critical": 0,  # Critical always goes to full SC
     }
 
+    RED_DURATION = {
+        "minor": 0,
+        "moderate": 0,
+        "major": 2,
+        "critical": 3,
+    }
+
     def __init__(
         self,
         random_seed: Optional[int] = None,
@@ -199,7 +206,9 @@ class SafetyCarController:
         self._rng = random.Random(random_seed)
         self._sc_laps_remaining: int = 0
         self._vsc_laps_remaining: int = 0
+        self._red_laps_remaining: int = 0
         self._total_sc_deployments: int = 0
+        self._total_red_flags: int = 0
         self._current_incident: Optional[Dict[str, Any]] = None
 
     @property
@@ -213,9 +222,14 @@ class SafetyCarController:
         return self._vsc_laps_remaining > 0
 
     @property
+    def is_red_active(self) -> bool:
+        """Return True if a red flag stoppage is currently active."""
+        return self._red_laps_remaining > 0
+
+    @property
     def is_any_sc_active(self) -> bool:
         """Return True if either SC or VSC is currently active."""
-        return self.is_sc_active or self.is_vsc_active
+        return self.is_sc_active or self.is_vsc_active or self.is_red_active
 
     @property
     def sc_laps_remaining(self) -> int:
@@ -226,6 +240,11 @@ class SafetyCarController:
     def vsc_laps_remaining(self) -> int:
         """Number of laps remaining under Virtual Safety Car."""
         return self._vsc_laps_remaining
+
+    @property
+    def red_laps_remaining(self) -> int:
+        """Number of suspended simulation ticks remaining under red flag."""
+        return self._red_laps_remaining
 
     def check_incident(
         self,
@@ -250,6 +269,29 @@ class SafetyCarController:
         for incident in race_state.incidents:
             if not incident.get("processed", False):
                 severity = incident.get("severity", "minor")
+
+                if incident.get("requires_red", False):
+                    incident["processed"] = True
+                    self._red_laps_remaining = self.get_red_duration(severity)
+                    self._sc_laps_remaining = 0
+                    self._vsc_laps_remaining = 0
+                    self._total_red_flags += 1
+                    self._current_incident = incident
+                    return incident
+
+                if (
+                    severity == "critical"
+                    and incident.get("requires_sc", False)
+                    and self._rng.random() < 0.45
+                ):
+                    incident["processed"] = True
+                    incident["requires_red"] = True
+                    self._red_laps_remaining = self.get_red_duration(severity)
+                    self._sc_laps_remaining = 0
+                    self._vsc_laps_remaining = 0
+                    self._total_red_flags += 1
+                    self._current_incident = incident
+                    return incident
 
                 if incident.get("requires_sc", False) and severity in ("major", "critical"):
                     incident["processed"] = True
@@ -282,12 +324,27 @@ class SafetyCarController:
             return max(2, base_duration + variation)
         return 0
 
+    def get_red_duration(self, severity: str) -> int:
+        """
+        Get the red flag stoppage duration for a given incident severity.
+
+        The duration is measured in simulation ticks where laps do not advance.
+        """
+        base_duration = self.RED_DURATION.get(severity, 0)
+        if base_duration > 0:
+            variation = self._rng.randint(-1, 1)
+            return max(1, base_duration + variation)
+        return 0
+
     def tick(self) -> None:
         """
         Decrement the safety car countdown by one lap.
 
         Called each race lap to count down active SC/VSC periods.
         """
+        if self._red_laps_remaining > 0:
+            self._red_laps_remaining -= 1
+            return
         if self._sc_laps_remaining > 0:
             self._sc_laps_remaining -= 1
         if self._vsc_laps_remaining > 0:
@@ -300,6 +357,8 @@ class SafetyCarController:
         Returns:
             Current FlagState enumeration value.
         """
+        if self._red_laps_remaining > 0:
+            return FlagState.RED
         if self._sc_laps_remaining > 0:
             return FlagState.SAFETY_CAR
         elif self._vsc_laps_remaining > 0:
@@ -310,7 +369,9 @@ class SafetyCarController:
         """Reset the safety car controller to initial state."""
         self._sc_laps_remaining = 0
         self._vsc_laps_remaining = 0
+        self._red_laps_remaining = 0
         self._total_sc_deployments = 0
+        self._total_red_flags = 0
         self._current_incident = None
 
 
@@ -340,6 +401,7 @@ class Incident:
     lap: int
     sector: int
     requires_sc: bool
+    requires_red: bool = False
     processed: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -352,5 +414,6 @@ class Incident:
             "lap": self.lap,
             "sector": self.sector,
             "requires_sc": self.requires_sc,
+            "requires_red": self.requires_red,
             "processed": self.processed,
         }

@@ -1,7 +1,9 @@
 """
-Personality System — transforms Driver attributes into plan-selection weights.
+Personality System — derives BDI behaviour weights from DriverProfile.
 
-Different personalities = genuinely different racing styles.
+The Personality is now auto-computed from the 10 sub-attributes in
+DriverProfile, so each driver has genuinely different thresholds,
+not just different priority weights.
 """
 
 from dataclasses import dataclass
@@ -15,90 +17,170 @@ from .plans import PlanName
 @dataclass
 class Personality:
     """
-    Derived personality profile from Driver attributes.
-    Used during deliberation and plan selection.
+    Derived personality profile that controls BDI deliberation thresholds.
+
+    All fields are 0.0–1.0.  They are computed from DriverProfile
+    sub-attributes, but can still be hand-overridden if needed.
+
+    New in this version:
+      - attack_gap_threshold:  gap (s) at which driver attempts overtake
+      - defence_gap_threshold: gap (s) at which driver starts defending
+      - tire_pit_wear:         wear % at which driver requests pit
+      - rain_switch_threshold: rain probability that triggers compound change
+      - commitment_override:   desire priority needed to interrupt a plan
+      - stint_extension:       extra laps a driver can nurse tires beyond predicted life
     """
-    name: str               # driver name for logging
-    aggression: float       # 0.0–1.0 — willingness to attack/risk
-    patience: float         # 0.0–1.0 — willingness to wait for right moment
-    defensiveness: float    # 0.0–1.0 — priority given to not losing positions
-    risk_tolerance: float   # 0.0–1.0 — SC gambles, rain crossings, undercuts
-    calculation: float      # 0.0–1.0 — uses look-ahead model vs gut feel
-    team_player: float      # 0.0–1.0 — defers to team orders
+    name: str
+
+    # ── Strategic personality (existing) ─────────────────────────────
+    aggression: float           # willingness to attack/risk
+    patience: float             # willingness to wait for right moment
+    defensiveness: float        # priority given to not losing positions
+    risk_tolerance: float       # SC gambles, rain crossings, undercuts
+    calculation: float          # uses look-ahead model vs gut feel
+    team_player: float          # defers to team orders
+
+    # ── Threshold modifiers (NEW — driver-specific) ──────────────────
+    attack_gap_threshold: float = 1.0     # gap (s) to start wanting to attack
+    defence_gap_threshold: float = 2.0    # gap (s) to start defending
+    tire_pit_wear: float = 0.90           # wear fraction that triggers PIT_NOW
+    rain_switch_threshold: float = 0.65   # rain probability for compound change
+    commitment_override: float = 0.85     # desire priority to interrupt a plan
+    stint_extension: float = 0.0          # extra laps nurse beyond predicted life
+    overtake_intensity: float = 1.15      # ATTACK plan pace multiplier
+    push_intensity: float = 1.12          # PUSH plan pace multiplier
+    manage_intensity: float = 0.85        # MANAGE plan pace multiplier
 
 
-# Pre-built personality profiles for each driver
-# These are derived from Driver.aggression / consistency / skill
+def build_personality_from_profile(profile) -> Personality:
+    """
+    Auto-derive a Personality from a DriverProfile.
 
-DRIVER_PERSONALITIES = {
-    # VER: ultra-aggressive, low patience, high calculation
-    1:  Personality("Verstappen",  aggression=0.92, patience=0.30, defensiveness=0.80,
-                     risk_tolerance=0.85, calculation=0.90, team_player=0.40),
-    # HAM: calculated, patient, defensive master, rain specialist
-    44: Personality("Hamilton",    aggression=0.70, patience=0.88, defensiveness=0.90,
-                     risk_tolerance=0.78, calculation=0.97, team_player=0.65),
-    # LEC: fast but impulsive, high aggression, medium patience
-    16: Personality("Leclerc",     aggression=0.85, patience=0.50, defensiveness=0.72,
-                     risk_tolerance=0.80, calculation=0.75, team_player=0.55),
-    # NOR: smooth, calculated, improving
-    4:  Personality("Norris",      aggression=0.78, patience=0.70, defensiveness=0.75,
-                     risk_tolerance=0.72, calculation=0.82, team_player=0.70),
-    # PIA: cold, calculating, patient
-    81: Personality("Piastri",     aggression=0.70, patience=0.80, defensiveness=0.70,
-                     risk_tolerance=0.68, calculation=0.85, team_player=0.75),
-    # ALO: chess player — extremely patient, calculated gambler
-    14: Personality("Alonso",      aggression=0.78, patience=0.95, defensiveness=0.88,
-                     risk_tolerance=0.90, calculation=0.97, team_player=0.30),
-    # RUS: precise, slightly aggressive, low risk
-    63: Personality("Russell",     aggression=0.78, patience=0.72, defensiveness=0.80,
-                     risk_tolerance=0.68, calculation=0.88, team_player=0.72),
-    # TSU: high aggression, low patience, medium calculation
-    22: Personality("Tsunoda",     aggression=0.85, patience=0.35, defensiveness=0.65,
-                     risk_tolerance=0.78, calculation=0.65, team_player=0.60),
-    # SAI: consistent, calculated, well-rounded
-    55: Personality("Sainz",       aggression=0.74, patience=0.78, defensiveness=0.80,
-                     risk_tolerance=0.72, calculation=0.85, team_player=0.75),
-    # ANT: rookie, aggressive, still learning patience
-    12: Personality("Antonelli",   aggression=0.82, patience=0.45, defensiveness=0.68,
-                     risk_tolerance=0.75, calculation=0.60, team_player=0.70),
-    # STR: conservative, low aggression
-    18: Personality("Stroll",      aggression=0.62, patience=0.70, defensiveness=0.72,
-                     risk_tolerance=0.55, calculation=0.65, team_player=0.75),
-    # GAS: aggressive, emotional, medium calculation
-    10: Personality("Gasly",       aggression=0.80, patience=0.55, defensiveness=0.68,
-                     risk_tolerance=0.72, calculation=0.70, team_player=0.60),
-    # DOO: rookie, medium aggression, learning
-    7:  Personality("Doohan",      aggression=0.72, patience=0.60, defensiveness=0.65,
-                     risk_tolerance=0.65, calculation=0.60, team_player=0.70),
-    # ALB: consistent, medium aggression, team player
-    23: Personality("Albon",       aggression=0.72, patience=0.72, defensiveness=0.75,
-                     risk_tolerance=0.65, calculation=0.75, team_player=0.80),
-    # LAW: aggressive, risk-taker
-    30: Personality("Lawson",      aggression=0.82, patience=0.50, defensiveness=0.68,
-                     risk_tolerance=0.78, calculation=0.68, team_player=0.55),
-    # HAD: rookie, medium stats across the board
-    6:  Personality("Hadjar",      aggression=0.75, patience=0.60, defensiveness=0.68,
-                     risk_tolerance=0.68, calculation=0.62, team_player=0.65),
-    # HUL: experienced, calculated, conservative
-    27: Personality("Hulkenberg",  aggression=0.68, patience=0.80, defensiveness=0.78,
-                     risk_tolerance=0.60, calculation=0.85, team_player=0.70),
-    # BOR: rookie, medium-low aggression
-    5:  Personality("Bortoleto",   aggression=0.70, patience=0.65, defensiveness=0.68,
-                     risk_tolerance=0.62, calculation=0.60, team_player=0.70),
-    # BEA: rookie, aggressive when opportunity arises
-    87: Personality("Bearman",     aggression=0.76, patience=0.58, defensiveness=0.70,
-                     risk_tolerance=0.70, calculation=0.65, team_player=0.68),
-    # OCO: calculated, medium aggression, team player
-    31: Personality("Ocon",        aggression=0.72, patience=0.70, defensiveness=0.75,
-                     risk_tolerance=0.65, calculation=0.78, team_player=0.72),
-    # Default for remaining drivers (midfield template)
-    0:  Personality("Default",     aggression=0.72, patience=0.62, defensiveness=0.70,
-                     risk_tolerance=0.65, calculation=0.70, team_player=0.65),
-}
+    This is where the sub-attributes translate into real thresholds:
+    - High overtaking → lower attack gap (attacks from further back)
+    - High defending → lower defence gap (reacts earlier to threats)
+    - High tire_management → later pit trigger + longer stint extension
+    - High adaptability → stays out longer in rain
+    - High control → higher commitment threshold (won't panic-switch)
+    - High experience → more patience, better calculation
+    """
+    p = profile
+
+    # ── Core personality axes ────────────────────────────────────────
+    aggression = min(1.0, (p.overtaking * 0.6 + (100 - p.control) * 0.4) / 100.0)
+    patience = min(1.0, (p.experience * 0.5 + p.tire_management * 0.3 + p.accuracy * 0.2) / 100.0)
+    defensiveness = min(1.0, (p.defending * 0.6 + p.accuracy * 0.4) / 100.0)
+    risk_tolerance = min(1.0, (p.overtaking * 0.3 + p.adaptability * 0.3 + (100 - p.accuracy) * 0.2 + p.start_skill * 0.2) / 100.0)
+    calculation = min(1.0, (p.experience * 0.4 + p.accuracy * 0.3 + p.control * 0.3) / 100.0)
+    team_player = min(1.0, (p.control * 0.4 + p.accuracy * 0.3 + (100 - p.overtaking) * 0.3) / 100.0)
+
+    # ── Threshold derivations (the key improvement) ──────────────────
+
+    # Attack gap: base 1.0s, aggressive/high-overtaking drivers attempt from further back
+    # VER (overtaking=95): 1.0 + 0.15*0.95 = 1.14s gap
+    # DOO (overtaking=76): 1.0 + 0.15*0.76 = 1.11s gap   (subtle diff)
+    # But then modulated by patience: impatient drivers add more range
+    overtake_norm = p.overtaking / 100.0
+    patience_factor = 1.0 - patience  # impatient = higher factor
+    attack_gap = 0.80 + overtake_norm * 0.25 + patience_factor * 0.20
+
+    # Defence gap: high defenders react to threats from further back
+    # HAM (defending=94): 1.5 + 0.94*0.8 = 2.25s
+    # ANT (defending=75): 1.5 + 0.75*0.8 = 2.10s
+    defend_norm = p.defending / 100.0
+    defence_gap = 1.50 + defend_norm * 0.80
+
+    # Tire pit trigger: base 0.85 wear, good tire managers delay further
+    # HAM (tire_management=93): 0.85 + 0.093 = 0.943
+    # TSU (tire_management=77): 0.85 + 0.077 = 0.927
+    tire_norm = p.tire_management / 100.0
+    tire_pit = 0.85 + tire_norm * 0.10
+
+    # Rain threshold: high adaptability = stays out in rain longer
+    # HAM (adaptability=97): 0.75 + 0.97*0.15 = 0.895  (very late switch)
+    # ANT (adaptability=81): 0.75 + 0.81*0.15 = 0.872
+    adapt_norm = p.adaptability / 100.0
+    rain_thresh = 0.55 + adapt_norm * 0.20
+
+    # Commitment override: experienced+controlled drivers don't panic-switch plans
+    # ALO (control=90, experience=99): 0.80 + 0.045 + 0.049 = 0.894
+    # LAW (control=76, experience=72): 0.80 + 0.038 + 0.036 = 0.874
+    control_norm = p.control / 100.0
+    exp_norm = p.experience / 100.0
+    commitment = 0.80 + control_norm * 0.05 + exp_norm * 0.05
+
+    # Stint extension: good tire managers can nurse tires 2-4 laps beyond predicted life
+    # HAM (tire_management=93): 2 + 0.93*2 = 3.86 laps
+    # TSU (tire_management=77): 2 + 0.77*2 = 3.54 laps
+    stint_ext = 2.0 + tire_norm * 2.0
+
+    # Push/Attack intensity: aggressive drivers push harder but risk more
+    push_int = 1.08 + aggression * 0.08    # 1.08–1.16
+    attack_int = 1.10 + aggression * 0.10  # 1.10–1.20
+    manage_int = 0.90 - patience * 0.10    # 0.80–0.90 (patient = slower manage)
+
+    return Personality(
+        name=p.name,
+        aggression=round(aggression, 3),
+        patience=round(patience, 3),
+        defensiveness=round(defensiveness, 3),
+        risk_tolerance=round(risk_tolerance, 3),
+        calculation=round(calculation, 3),
+        team_player=round(team_player, 3),
+        attack_gap_threshold=round(attack_gap, 3),
+        defence_gap_threshold=round(defence_gap, 3),
+        tire_pit_wear=round(tire_pit, 3),
+        rain_switch_threshold=round(rain_thresh, 3),
+        commitment_override=round(commitment, 3),
+        stint_extension=round(stint_ext, 2),
+        overtake_intensity=round(attack_int, 3),
+        push_intensity=round(push_int, 3),
+        manage_intensity=round(manage_int, 3),
+    )
+
+
+# Pre-built personality cache — populated on first access
+_PERSONALITY_CACHE: dict = {}
 
 
 def get_personality(driver_number: int) -> Personality:
-    return DRIVER_PERSONALITIES.get(driver_number, DRIVER_PERSONALITIES[0])
+    """
+    Get a personality for a driver, auto-building from DriverProfile.
+
+    Falls back to a default midfield personality if no profile exists.
+    """
+    if driver_number in _PERSONALITY_CACHE:
+        return _PERSONALITY_CACHE[driver_number]
+
+    # Import here to avoid circular dependency
+    from simulation.driver_profile import get_profile
+
+    profile = get_profile(driver_number)
+    personality = build_personality_from_profile(profile)
+    _PERSONALITY_CACHE[driver_number] = personality
+    return personality
+
+
+# ── Legacy support: DRIVER_PERSONALITIES dict ────────────────────────
+# Some code may still reference this dict directly.
+# Lazily populated from profiles on first access.
+
+class _LazyPersonalityDict(dict):
+    """Dict that auto-populates from DriverProfile on key access."""
+
+    def __missing__(self, key):
+        p = get_personality(key)
+        self[key] = p
+        return p
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default if default is not None else get_personality(0)
+
+
+DRIVER_PERSONALITIES = _LazyPersonalityDict()
 
 
 class PlanSelector:
@@ -121,11 +203,10 @@ class PlanSelector:
 
         Returns None if the agent should continue current plan unchanged.
         """
-        # Commitment: don't drop a plan mid-execution unless overridden by urgent desire
+        # Commitment: use personality-specific override threshold
         if current_plan and not current_plan.is_complete() and not current_plan.is_expired():
             top = desires[0] if desires else None
-            # Only urgent desires (priority > 0.85) can interrupt a committed plan
-            if top is None or top.priority < 0.85:
+            if top is None or top.priority < personality.commitment_override:
                 return None  # continue current plan
 
         if not desires:
@@ -140,7 +221,7 @@ class PlanSelector:
             GoalType.REACT_TO_RAIN:         PlanName.PIT_THIS_LAP,
             GoalType.NAIL_COMPOUND_RULE:    PlanName.PIT_THIS_LAP,
             GoalType.GAIN_POSITION:         PlanSelector._pick_attack_plan(beliefs, personality),
-            GoalType.PROTECT_POSITION:      PlanName.DEFEND_PUSH,
+            GoalType.PROTECT_POSITION:      PlanSelector._pick_defend_plan(beliefs, personality),
             GoalType.DEFEND_FROM_UNDERCUT:  PlanName.PUSH_MODE,
             GoalType.EXTEND_STINT:          PlanName.EXTEND_STINT,
             GoalType.MANAGE_TIRES:          PlanName.MANAGE_MODE,
@@ -160,7 +241,17 @@ class PlanSelector:
         # If gap is very small and we have DRS, try DRS zone attack
         if s.gap_ahead is not None and s.gap_ahead < 0.5:
             return PlanName.ATTACK_DRS_ZONE
-        # If calculation is high, consider undercut
+        # Calculated drivers consider undercut from further back
         if personality.calculation > 0.80 and s.gap_ahead is not None and s.gap_ahead < 3.0:
             return PlanName.UNDERCUT_RIVAL
         return PlanName.ATTACK_DRS_ZONE
+
+    @staticmethod
+    def _pick_defend_plan(beliefs: BeliefBase, personality: Personality) -> PlanName:
+        """Choose between pushing to open gap vs positional defence."""
+        s = beliefs.self_belief
+        # If gap behind is very small, try positional defence (block inside line)
+        if s.gap_behind is not None and s.gap_behind < 0.5 and personality.defensiveness > 0.80:
+            return PlanName.DEFEND_INSIDE_LINE
+        # Otherwise push to open gap
+        return PlanName.DEFEND_PUSH

@@ -105,10 +105,10 @@ class PlanLibrary:
             )
 
         if plan_name == PlanName.PUSH_MODE:
-            # Push hard for 3 laps (open gap, defend undercut)
+            # Push hard for 3 laps — intensity from personality profile
             return Plan(
                 name=PlanName.PUSH_MODE,
-                steps=[PlanStep("PUSH", intensity=1.12 + personality.aggression * 0.1)] * 3,
+                steps=[PlanStep("PUSH", intensity=personality.push_intensity)] * 3,
                 max_laps=3,
             )
 
@@ -117,22 +117,23 @@ class PlanLibrary:
             return Plan(
                 name=PlanName.ATTACK_DRS_ZONE,
                 steps=[
-                    PlanStep("MANAGE", intensity=1.05),   # lap 1: get into DRS window
-                    PlanStep("ATTACK", intensity=1.15),   # lap 2: attempt the move
-                    PlanStep("PUSH",   intensity=1.10),   # lap 3: consolidate
+                    PlanStep("MANAGE", intensity=1.05),                       # lap 1: get into DRS window
+                    PlanStep("ATTACK", intensity=personality.overtake_intensity),  # lap 2: attempt the move
+                    PlanStep("PUSH",   intensity=personality.push_intensity * 0.95),  # lap 3: consolidate
                 ],
                 max_laps=4,
             )
 
         if plan_name == PlanName.UNDERCUT_RIVAL:
             compound = PlanLibrary._choose_compound(beliefs, personality)
+            push = personality.push_intensity
             return Plan(
                 name=PlanName.UNDERCUT_RIVAL,
                 steps=[
-                    PlanStep("PIT", compound=compound),   # pit now
-                    PlanStep("PUSH", intensity=1.15),     # push on fresh rubber
-                    PlanStep("PUSH", intensity=1.12),
-                    PlanStep("PUSH", intensity=1.05),
+                    PlanStep("PIT", compound=compound),         # pit now
+                    PlanStep("PUSH", intensity=push),           # push on fresh rubber
+                    PlanStep("PUSH", intensity=push * 0.97),    # sustain
+                    PlanStep("PUSH", intensity=push * 0.92),    # ease off
                 ],
                 max_laps=5,
             )
@@ -148,14 +149,14 @@ class PlanLibrary:
         if plan_name == PlanName.DEFEND_PUSH:
             return Plan(
                 name=PlanName.DEFEND_PUSH,
-                steps=[PlanStep("PUSH", intensity=1.10)] * 3,
+                steps=[PlanStep("PUSH", intensity=personality.push_intensity * 0.96)] * 3,
                 max_laps=3,
             )
 
         if plan_name == PlanName.MANAGE_MODE:
             return Plan(
                 name=PlanName.MANAGE_MODE,
-                steps=[PlanStep("MANAGE", intensity=0.85)] * 6,
+                steps=[PlanStep("MANAGE", intensity=personality.manage_intensity)] * 6,
                 max_laps=6,
             )
 
@@ -205,7 +206,8 @@ class PlanLibrary:
             return "INTERMEDIATE"
 
         # Aggressive personality bias toward softer compounds
-        soft_bias = personality.aggression * 5  # up to 5 extra laps of SOFT tolerance
+        # High risk_tolerance = more SOFT usage; high tire_management = can sustain them
+        soft_bias = personality.aggression * 3 + personality.risk_tolerance * 2
 
         if laps_remaining <= 8 + soft_bias:
             return "SOFT"
