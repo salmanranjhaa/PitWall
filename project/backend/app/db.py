@@ -95,4 +95,35 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_laps_session ON laps(session_id);
             CREATE INDEX IF NOT EXISTS idx_laps_driver  ON laps(driver);
             CREATE INDEX IF NOT EXISTS idx_weather_session ON weather(session_id);
+
+            CREATE TABLE IF NOT EXISTS users (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+                display_name  TEXT    NOT NULL,
+                password_hash TEXT    NOT NULL,
+                created_at    TEXT    DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS auth_tokens (
+                token       TEXT PRIMARY KEY,
+                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at  TEXT DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS race_results (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                session_key  TEXT    NOT NULL,
+                track        TEXT    NOT NULL,
+                team         TEXT    NOT NULL,
+                position     INTEGER NOT NULL,
+                total_laps   INTEGER NOT NULL,
+                pits         INTEGER NOT NULL DEFAULT 0,
+                dnf          INTEGER NOT NULL DEFAULT 0,
+                points       INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT DEFAULT (datetime('now')),
+                UNIQUE(user_id, session_key)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_results_user ON race_results(user_id);
         """)

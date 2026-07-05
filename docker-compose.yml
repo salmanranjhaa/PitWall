@@ -1,0 +1,30 @@
+services:
+  pitwall-backend:
+    build: ./project/backend
+    container_name: pitwall-backend
+    restart: unless-stopped
+    environment:
+      - ALLOWED_ORIGINS=https://pitwall.34.17.100.46.sslip.io,http://localhost:5173
+    volumes:
+      # SQLite (user accounts, race results, FastF1 cache) survives rebuilds
+      - pitwall_data:/app/data
+    networks:
+      - lifeplan-net
+
+  pitwall-web:
+    build: ./frontend-app
+    container_name: pitwall-web
+    restart: unless-stopped
+    depends_on:
+      - pitwall-backend
+    networks:
+      - lifeplan-net
+
+volumes:
+  pitwall_data:
+
+networks:
+  # Shared reverse-proxy network owned by the loaded-out infra stack;
+  # the VM's central Caddy reaches pitwall-web through it.
+  lifeplan-net:
+    external: true

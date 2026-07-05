@@ -510,7 +510,7 @@ export default function Setup() {
                         ? "ring-2 scale-[1.02]"
                         : "border-border-subtle bg-surface hover:border-text-ghost/30"
                     }`}
-                    style={isActive ? { borderColor: s.riskColor + "80", ringColor: s.riskColor, backgroundColor: s.riskColor + "08" } : {}}
+                    style={isActive ? { borderColor: s.riskColor + "80", "--tw-ring-color": s.riskColor, backgroundColor: s.riskColor + "08" } as React.CSSProperties : {}}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-black text-text-primary">{s.name}</span>

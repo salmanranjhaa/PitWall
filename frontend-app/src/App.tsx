@@ -7,6 +7,7 @@ import Leaderboard from './pages/Leaderboard';
 import WeatherCenter from './pages/Weather';
 import StrategyAnalysis from './pages/Strategy';
 import Qualifying from './pages/Qualifying';
+import Profile from './pages/Profile';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/weather" element={<WeatherCenter />} />
           <Route path="/strategy" element={<StrategyAnalysis />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </Layout>
     </HashRouter>

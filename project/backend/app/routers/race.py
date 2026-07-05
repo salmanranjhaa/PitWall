@@ -232,7 +232,9 @@ def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-_SPEED_TO_SLEEP: Dict[int, float] = {1: 2.0, 2: 1.0, 5: 0.4, 10: 0.15, 20: 0.02}
+# Seconds between laps per speed setting. 1x is deliberately slow — the player
+# needs time to read gaps, tire wear, and weather before making a call.
+_SPEED_TO_SLEEP: Dict[int, float] = {1: 10.0, 2: 6.0, 5: 3.5, 10: 1.5, 20: 0.5}
 
 
 async def _race_stream_generator(session_id: str, lap_interval: float = 0.4) -> AsyncGenerator[str, None]:
@@ -299,7 +301,7 @@ async def stream_race(session_id: str, speed: int = 5):
     """
     Server-Sent Events endpoint for automatic race playback.
 
-    speed param: 1=2s/lap, 2=1s/lap, 5=0.4s/lap (default), 10=0.15s/lap, 20=0.02s/lap
+    speed param: 1=10s/lap (strategy pace), 2=6s/lap, 5=3.5s/lap, 10=1.5s/lap, 20=0.5s/lap
 
     Connect with EventSource:
         const es = new EventSource('/api/race/stream?session_id=race_0&speed=5');

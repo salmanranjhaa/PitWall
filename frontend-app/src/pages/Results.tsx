@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  Trophy, RotateCcw, TrendingUp, Zap, Flag, Timer, ChevronRight,
+  Trophy, RotateCcw, TrendingUp, Zap, Flag, Timer, ChevronRight, Star,
 } from "lucide-react";
+import { isLoggedIn, submitRaceResult, type RaceResultResponse } from "@/services/auth";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, ReferenceLine, Legend,
@@ -113,6 +114,20 @@ export default function Results() {
     }
   }, []);
 
+  // Record the finished race on the player's profile (once per session).
+  const [careerResult, setCareerResult] = useState<RaceResultResponse | null>(null);
+  useEffect(() => {
+    const sessionId = localStorage.getItem("f1_session_id");
+    if (!result || !sessionId || sessionId === "mock" || !isLoggedIn()) return;
+    if (localStorage.getItem("pitwall_submitted_session") === sessionId) return;
+    submitRaceResult(sessionId)
+      .then((r) => {
+        localStorage.setItem("pitwall_submitted_session", sessionId);
+        setCareerResult(r);
+      })
+      .catch(() => { /* already recorded or race not finished — ignore */ });
+  }, [result]);
+
   // ── derived data ────────────────────────────────────────────────────────────
 
   const lapHistory     = result?.lapHistory ?? [];
@@ -212,6 +227,25 @@ export default function Results() {
           </div>
         )}
       </motion.div>
+
+      {/* Career points banner */}
+      {careerResult && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+          style={{
+            backgroundColor: careerResult.points > 0 ? "#FFB80015" : "#16161E",
+            borderColor: careerResult.points > 0 ? "#FFB80040" : "#2D2D3D",
+          }}>
+          <Star className="w-5 h-5" style={{ color: careerResult.points > 0 ? "#FFB800" : "#6B6B8A" }} />
+          <p className="text-sm text-text-secondary">
+            {careerResult.dnf
+              ? "DNF recorded on your driver profile — no points this time."
+              : careerResult.points > 0
+                ? <>Result saved to your profile — <span className="font-black text-amber-400">+{careerResult.points} championship points</span>{careerResult.is_win ? " and a WIN 🏆" : careerResult.is_podium ? " and a podium!" : "!"}</>
+                : "Result saved to your driver profile — points are awarded for a top-10 finish."}
+          </p>
+        </motion.div>
+      )}
 
       {/* Podium */}
       {podium.length >= 3 && (

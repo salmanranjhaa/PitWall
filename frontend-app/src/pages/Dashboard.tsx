@@ -402,6 +402,8 @@ function SCNotification({
 // ── speed controller ──────────────────────────────────────────────────────────
 
 const SPEED_OPTIONS = [1, 2, 5, 10, 20] as const;
+// Mirrors the backend _SPEED_TO_SLEEP map — seconds of real time per race lap
+const SPEED_SECONDS_PER_LAP: Record<number, number> = { 1: 10, 2: 6, 5: 3.5, 10: 1.5, 20: 0.5 };
 type SimSpeed = typeof SPEED_OPTIONS[number];
 
 // ── main component ────────────────────────────────────────────────────────────
@@ -966,7 +968,7 @@ export default function Dashboard() {
             ) : isPaused ? (
               <span className="text-warning-amber">PAUSED</span>
             ) : (
-              <span>{simSpeed}× speed</span>
+              <span>{simSpeed}× speed · {SPEED_SECONDS_PER_LAP[simSpeed]}s / lap</span>
             )}
           </div>
         </div>

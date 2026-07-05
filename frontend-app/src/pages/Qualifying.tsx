@@ -664,8 +664,9 @@ export default function Qualifying() {
   const displayProgress = 1 - displayTime / total_time;
   const segColor = SEGMENT_COLORS[segment] ?? "#FF1E00";
   const playerEntry = classification.find((d) => d.is_player);
-  const gapToSafe = playerEntry?.in_danger && classification[safe_count - 1]?.best_time && playerEntry.best_time
-    ? playerEntry.best_time - classification[safe_count - 1].best_time
+  const safeTime = classification[safe_count - 1]?.best_time ?? null;
+  const gapToSafe = playerEntry?.in_danger && safeTime != null && playerEntry.best_time != null
+    ? playerEntry.best_time - safeTime
     : null;
   const playerStyle = playerEntry ? DRIVER_STYLES[getLastName(playerEntry.name)] : undefined;
 

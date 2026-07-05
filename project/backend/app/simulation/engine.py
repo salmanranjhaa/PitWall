@@ -819,14 +819,14 @@ class RaceEngine:
             {
                 "lap": self._current_lap + i + 1,
                 "condition": f.condition,
-                "air_temp": f.air_temp,
-                "track_temp": f.track_temp,
-                "humidity": f.humidity,
-                "rain_intensity": f.rain_intensity,
-                "rain_probability": f.rain_intensity,
-                "track_dampness": f.track_dampness,
-                "wind_speed": f.wind_speed,
-                "is_raining": f.rain_intensity > 0.05,
+                "air_temp": float(f.air_temp),
+                "track_temp": float(f.track_temp),
+                "humidity": float(f.humidity),
+                "rain_intensity": float(f.rain_intensity),
+                "rain_probability": float(f.rain_intensity),
+                "track_dampness": float(f.track_dampness),
+                "wind_speed": float(f.wind_speed),
+                "is_raining": bool(f.rain_intensity > 0.05),
             }
             for i, f in enumerate(forecast)
         ]
@@ -1627,6 +1627,10 @@ class RaceEngine:
         for car in self._cars:
             if car.alive:
                 car.finished = True
+                # Unserved steward penalties are added to the final race time
+                if car.pending_time_penalty > 0:
+                    car.total_time += car.pending_time_penalty
+                    car.pending_time_penalty = 0.0
 
         # Final sort by total time
         self._cars.sort(key=lambda c: c.total_time if c.alive else float('inf'))

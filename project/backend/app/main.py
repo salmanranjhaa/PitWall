@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import race, strategy, weather, data, qualify
+from routers import race, strategy, weather, data, qualify, auth
 
 # ---------------------------------------------------------------------------
 # CORS — driven by environment variable for production safety
@@ -67,6 +67,8 @@ def create_app() -> FastAPI:
     app.include_router(strategy.router)
     app.include_router(weather.router)
     app.include_router(data.router)
+    app.include_router(auth.router)
+    app.include_router(auth.profile_router)
 
     # Root endpoint
     @app.get("/", include_in_schema=False)

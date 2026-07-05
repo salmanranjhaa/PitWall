@@ -381,7 +381,7 @@ export default function StrategyAnalysis() {
             <div className="flex gap-4 mt-3 flex-wrap">
               {activeScenario.stints.map((s, i) => (
                 <div key={i} className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TIRE_C[s.compound as keyof typeof TIRE_C] + "CC" ?? "#888CC" }} />
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: (TIRE_C[s.compound as keyof typeof TIRE_C] ?? "#888888") + "CC" }} />
                   <span className="text-[10px] text-text-secondary">{s.compound} — {s.laps} laps</span>
                 </div>
               ))}

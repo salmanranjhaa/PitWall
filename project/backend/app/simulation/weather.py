@@ -365,12 +365,14 @@ class WeatherSystem:
             most_common = max(set(conditions), key=conditions.count)
 
             # Average numerical values across all simulations
-            avg_air_temp = np.mean([path[lap_idx].air_temp for path in all_paths])
-            avg_track_temp = np.mean([path[lap_idx].track_temp for path in all_paths])
-            avg_humidity = np.mean([path[lap_idx].humidity for path in all_paths])
-            avg_rain = np.mean([path[lap_idx].rain_intensity for path in all_paths])
-            avg_dampness = np.mean([path[lap_idx].track_dampness for path in all_paths])
-            avg_wind = np.mean([path[lap_idx].wind_speed for path in all_paths])
+            # Cast to plain float — np.float64 propagates np.bool_ into API
+            # responses (FastAPI's encoder cannot serialize numpy bools).
+            avg_air_temp = float(np.mean([path[lap_idx].air_temp for path in all_paths]))
+            avg_track_temp = float(np.mean([path[lap_idx].track_temp for path in all_paths]))
+            avg_humidity = float(np.mean([path[lap_idx].humidity for path in all_paths]))
+            avg_rain = float(np.mean([path[lap_idx].rain_intensity for path in all_paths]))
+            avg_dampness = float(np.mean([path[lap_idx].track_dampness for path in all_paths]))
+            avg_wind = float(np.mean([path[lap_idx].wind_speed for path in all_paths]))
 
             forecast.append(WeatherState(
                 condition=most_common,

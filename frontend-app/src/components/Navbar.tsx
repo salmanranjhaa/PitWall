@@ -9,6 +9,7 @@ import {
   CloudRain,
   Brain,
   Menu,
+  User,
   X,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,6 +22,7 @@ const routeTitles: Record<string, string> = {
   "/leaderboard": "LEADERBOARD",
   "/weather": "WEATHER CENTER",
   "/strategy": "STRATEGY ANALYSIS",
+  "/profile": "DRIVER PROFILE",
 };
 
 const navLinks = [
@@ -30,6 +32,7 @@ const navLinks = [
   { path: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
   { path: "/weather", label: "Weather Center", icon: CloudRain },
   { path: "/strategy", label: "Strategy Analysis", icon: Brain },
+  { path: "/profile", label: "Driver Profile", icon: User },
 ];
 
 export default function Navbar() {

@@ -148,26 +148,73 @@ def _generate_forecast(track_name: str, n_laps: int = 10) -> List[Dict]:
 # ---------------------------------------------------------------------------
 
 
+def _get_session_engine(session_id: str):
+    """Look up an active race engine from the race router's session store."""
+    try:
+        from routers.race import _race_engines
+    except ImportError:
+        from .race import _race_engines
+    return _race_engines.get(session_id)
+
+
 @router.get("/current")
 def get_current_weather(session_id: str):
     """
     Get current weather conditions for an active race session.
+
+    Reads the live WeatherState from the session's race engine; falls back
+    to a representative dry-weather default if the session is unknown.
     """
-    # In production: look up from the session engine
-    # Here we return a representative dry-weather default
+    engine = _get_session_engine(session_id)
+    state = engine.get_state() if engine else None
+    weather = getattr(state, "weather", None) if state else None
+
+    if weather is not None:
+        return {
+            "session_id": session_id,
+            "condition": weather.condition,
+            "air_temp": weather.air_temp,
+            "track_temp": weather.track_temp,
+            "air_temperature": weather.air_temp,
+            "track_temperature": weather.track_temp,
+            "humidity": weather.humidity,
+            "rain_probability": weather.rain_intensity,
+            "is_raining": bool(weather.rain_intensity > 0.05),
+            "track_dampness": weather.track_dampness,
+            "wind_speed": weather.wind_speed,
+            "forecast_next_10_laps": getattr(state, "weather_forecast", []),
+        }
+
+    # Unknown session — representative default
     return {
         "session_id": session_id,
         "condition": "DRY",
+        "air_temp": 28,
+        "track_temp": 42,
         "air_temperature": 28,
         "track_temperature": 42,
         "humidity": 45,
         "rain_probability": 0.05,
+        "is_raining": False,
         "track_dampness": 0.0,
         "wind_speed": 12,
-        "wind_direction": random.randint(0, 360),
-        "pressure": 1013,
         "forecast_next_10_laps": _generate_forecast("bahrain", n_laps=10),
     }
+
+
+@router.get("/forecast")
+def get_session_forecast(session_id: str, laps: int = 10):
+    """
+    Lap-by-lap weather forecast for an active race session.
+
+    This is the endpoint the frontend calls with a session_id query param;
+    the /forecast/{track_name} variant below serves track-profile forecasts.
+    """
+    engine = _get_session_engine(session_id)
+    if engine is not None and hasattr(engine, "get_weather_forecast"):
+        return {"session_id": session_id, "forecast": engine.get_weather_forecast(laps)}
+
+    return {"session_id": session_id, "forecast": _generate_forecast("default", n_laps=laps)}
 
 
 @router.get("/history/{track_name}")
