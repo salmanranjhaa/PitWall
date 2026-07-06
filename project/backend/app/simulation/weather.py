@@ -473,7 +473,7 @@ class WeatherSystem:
             "Hungary": 47.5, "Spa": 50.4, "Zandvoort": 52.4,
             "Monza": 45.6, "Baku": 40.4, "Singapore": 1.3,
             "COTA": 30.1, "Las Vegas": 36.1, "Qatar": 25.5,
-            "Abu Dhabi": 24.5, "Brazil": -23.5, "Portugal": 37.2,
+            "Abu Dhabi": 24.5, "Brazil": -23.5, "Mexico": 19.4,
         }
 
         latitude = track_latitudes.get(self.track.country, 40.0)

@@ -174,24 +174,44 @@ MIAMI = Track(
     reference_lap_times={"SOFT": 88.5, "MEDIUM": 90.2, "HARD": 92.0},
 )
 
-IMOLA = Track(
-    name="Autodromo Enzo e Dino Ferrari",
-    location="Imola",
-    country="Italy",
-    length_km=4.909,
-    laps=63,
+MADRID = Track(
+    name="Madring",
+    location="Madrid",
+    country="Spain",
+    length_km=5.470,
+    laps=57,
+    corners=22,
+    drs_zones=3,
+    pit_loss_time=22.0,
+    tire_severity=6,
+    overtaking_difficulty=6,
+    downforce_level="medium-high",
+    sc_probability=0.45,
+    fuel_per_lap=1.50,
+    rain_probability={1: 0.12, 2: 0.12, 3: 0.14, 4: 0.16, 5: 0.14,
+                      6: 0.08, 7: 0.04, 8: 0.05, 9: 0.10, 10: 0.15,
+                      11: 0.14, 12: 0.12},
+    reference_lap_times={"SOFT": 92.0, "MEDIUM": 93.8, "HARD": 95.5},
+)
+
+MEXICO = Track(
+    name="Autodromo Hermanos Rodriguez",
+    location="Mexico City",
+    country="Mexico",
+    length_km=4.304,
+    laps=71,
     corners=17,
-    drs_zones=1,
+    drs_zones=3,
     pit_loss_time=21.5,
-    tire_severity=7,
-    overtaking_difficulty=8,
-    downforce_level="high",
+    tire_severity=3,
+    overtaking_difficulty=5,
+    downforce_level="maximum",
     sc_probability=0.40,
-    fuel_per_lap=1.45,
-    rain_probability={1: 0.10, 2: 0.12, 3: 0.15, 4: 0.20, 5: 0.18,
-                      6: 0.15, 7: 0.12, 8: 0.14, 9: 0.18, 10: 0.20,
-                      11: 0.16, 12: 0.12},
-    reference_lap_times={"SOFT": 75.5, "MEDIUM": 77.2, "HARD": 79.0},
+    fuel_per_lap=1.30,
+    rain_probability={1: 0.05, 2: 0.05, 3: 0.06, 4: 0.08, 5: 0.12,
+                      6: 0.20, 7: 0.18, 8: 0.18, 9: 0.20, 10: 0.15,
+                      11: 0.08, 12: 0.05},
+    reference_lap_times={"SOFT": 77.5, "MEDIUM": 79.2, "HARD": 81.0},
 )
 
 MONACO = Track(
@@ -514,55 +534,36 @@ BRAZIL = Track(
     reference_lap_times={"SOFT": 70.0, "MEDIUM": 71.5, "HARD": 73.0},
 )
 
-PORTUGAL = Track(
-    name="Autodromo Internacional do Algarve",
-    location="Portimao",
-    country="Portugal",
-    length_km=4.653,
-    laps=66,
-    corners=15,
-    drs_zones=1,
-    pit_loss_time=21.5,
-    tire_severity=8,
-    overtaking_difficulty=6,
-    downforce_level="medium-high",
-    sc_probability=0.35,
-    fuel_per_lap=1.42,
-    rain_probability={1: 0.12, 2: 0.10, 3: 0.12, 4: 0.15, 5: 0.12,
-                      6: 0.08, 7: 0.03, 8: 0.03, 9: 0.08, 10: 0.12,
-                      11: 0.14, 12: 0.13},
-    reference_lap_times={"SOFT": 79.0, "MEDIUM": 80.8, "HARD": 82.5},
-)
-
 # =============================================================================
-# TRACK REGISTRY
+# TRACK REGISTRY — full 2026 calendar (24 rounds)
+# Imola and Portimao dropped; Madrid (Madring) and Mexico City on the calendar.
 # =============================================================================
 
 TRACK_DATABASE: Dict[str, Track] = {
+    "Melbourne": MELBOURNE,
+    "Shanghai": SHANGHAI,
+    "Suzuka": SUZUKA,
     "Bahrain": BAHRAIN,
     "Jeddah": JEDDAH,
-    "Melbourne": MELBOURNE,
-    "Suzuka": SUZUKA,
-    "Shanghai": SHANGHAI,
     "Miami": MIAMI,
-    "Imola": IMOLA,
-    "Monaco": MONACO,
     "Canada": CANADA,
+    "Monaco": MONACO,
     "Spain": SPAIN,
     "Austria": AUSTRIA,
     "Silverstone": SILVERSTONE,
-    "Hungary": HUNGARY,
     "Spa": SPA,
+    "Hungary": HUNGARY,
     "Zandvoort": ZANDVOORT,
     "Monza": MONZA,
+    "Madrid": MADRID,
     "Baku": BAKU,
     "Singapore": SINGAPORE,
     "COTA": COTA,
+    "Mexico": MEXICO,
+    "Brazil": BRAZIL,
     "Las Vegas": LAS_VEGAS,
     "Qatar": QATAR,
     "Abu Dhabi": ABU_DHABI,
-    "Brazil": BRAZIL,
-    "Portugal": PORTUGAL,
 }
 
 

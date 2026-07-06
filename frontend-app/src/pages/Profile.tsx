@@ -10,7 +10,7 @@ import {
 
 // ── auth form ─────────────────────────────────────────────────────────────────
 
-function AuthForm({ onAuthed }: { onAuthed: () => void }) {
+export function AuthForm({ onAuthed }: { onAuthed: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

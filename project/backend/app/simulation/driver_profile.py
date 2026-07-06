@@ -175,213 +175,230 @@ class DriverProfile:
 
 
 # =============================================================================
-# 2025 F1 DRIVER PROFILES
+# 2026 F1 DRIVER PROFILES (22 drivers, 11 teams — Cadillac joins, Audi debuts)
 # =============================================================================
-# Ratings based on F1 25 game values as reference with sub-attributes
-# hand-tuned for realistic BDI behaviour.  Gaps between drivers are
-# deliberately subtle (2–5 pts) to avoid cartoonish behaviour differences.
+# Sub-attributes hand-tuned for realistic BDI behaviour. The hierarchy is
+# deliberate: Verstappen sits alone at the top, Hamilton/Alonso own racecraft
+# and experience, the McLaren pair are the class field benchmark, and the
+# rookies make mistakes. Keyed by 2026 race number.
 # =============================================================================
 
 DRIVER_PROFILES: Dict[int, DriverProfile] = {
 
-    # ── Max Verstappen — #1 ──────────────────────────────────────────
-    # Dominant pace, aggressive overtaker, elite consistency, 10 years XP
+    # ── Max Verstappen — #33 (Red Bull Racing) ───────────────────────
+    # Generational outlier: peerless one-lap speed, race pace, wet mastery
+    33: DriverProfile(
+        name="Max Verstappen", number=33,
+        qualifying_pace=99, race_pace=99,
+        overtaking=97, defending=95, start_skill=93,
+        control=93, accuracy=97, tire_management=90,
+        experience=93, adaptability=99,
+    ),
+
+    # ── Lando Norris — #1 (McLaren, reigning champion) ───────────────
     1: DriverProfile(
-        name="Max Verstappen", number=1,
-        qualifying_pace=97, race_pace=96,
-        overtaking=95, defending=90, start_skill=92,
-        control=88, accuracy=95, tire_management=82,
-        experience=88, adaptability=94,
+        name="Lando Norris", number=1,
+        qualifying_pace=96, race_pace=95,
+        overtaking=90, defending=88, start_skill=86,
+        control=91, accuracy=93, tire_management=90,
+        experience=86, adaptability=92,
     ),
 
-    # ── Lando Norris — #4 ────────────────────────────────────────────
-    # Very fast, smooth racecraft, strong in wet, improving experience
-    4: DriverProfile(
-        name="Lando Norris", number=4,
-        qualifying_pace=95, race_pace=94,
-        overtaking=90, defending=86, start_skill=85,
-        control=90, accuracy=92, tire_management=88,
-        experience=82, adaptability=91,
-    ),
-
-    # ── Charles Leclerc — #16 ────────────────────────────────────────
-    # Blistering qualifying pace, aggressive racer, occasional errors
-    16: DriverProfile(
-        name="Charles Leclerc", number=16,
-        qualifying_pace=96, race_pace=93,
-        overtaking=91, defending=84, start_skill=88,
-        control=82, accuracy=88, tire_management=85,
-        experience=82, adaptability=85,
-    ),
-
-    # ── George Russell — #63 ─────────────────────────────────────────
-    # Precise, strong qualifier, great awareness, solid all-round
-    63: DriverProfile(
-        name="George Russell", number=63,
-        qualifying_pace=94, race_pace=92,
-        overtaking=85, defending=88, start_skill=90,
-        control=93, accuracy=92, tire_management=87,
-        experience=82, adaptability=90,
-    ),
-
-    # ── Oscar Piastri — #81 ──────────────────────────────────────────
-    # Clinical, calculated, excellent tire management, fast learner
+    # ── Oscar Piastri — #81 (McLaren) ────────────────────────────────
+    # Ice-cold, clinical, elite tire life, now a proven race winner
     81: DriverProfile(
         name="Oscar Piastri", number=81,
-        qualifying_pace=93, race_pace=93,
-        overtaking=88, defending=85, start_skill=84,
-        control=92, accuracy=90, tire_management=90,
-        experience=70, adaptability=82,
+        qualifying_pace=95, race_pace=95,
+        overtaking=90, defending=88, start_skill=86,
+        control=94, accuracy=93, tire_management=92,
+        experience=80, adaptability=87,
     ),
 
-    # ── Lewis Hamilton — #44 ─────────────────────────────────────────
-    # Legendary experience, elite wet driving, patient racer, still fast
+    # ── Charles Leclerc — #16 (Ferrari) ──────────────────────────────
+    # Still the outright qualifying ace; race-day errors under pressure
+    16: DriverProfile(
+        name="Charles Leclerc", number=16,
+        qualifying_pace=97, race_pace=93,
+        overtaking=91, defending=85, start_skill=89,
+        control=84, accuracy=89, tire_management=86,
+        experience=86, adaptability=87,
+    ),
+
+    # ── Lewis Hamilton — #44 (Ferrari) ───────────────────────────────
+    # The racecraft/experience GOAT: peak one-lap edge faded, everything
+    # else — defending, wet driving, tire whispering — still best-in-class
     44: DriverProfile(
         name="Lewis Hamilton", number=44,
-        qualifying_pace=92, race_pace=93,
-        overtaking=92, defending=94, start_skill=87,
-        control=92, accuracy=94, tire_management=93,
-        experience=98, adaptability=97,
+        qualifying_pace=91, race_pace=93,
+        overtaking=93, defending=96, start_skill=88,
+        control=93, accuracy=94, tire_management=95,
+        experience=99, adaptability=98,
     ),
 
-    # ── Fernando Alonso — #14 ────────────────────────────────────────
-    # Supreme experience and racecraft, elite defender, tire whisperer
-    14: DriverProfile(
-        name="Fernando Alonso", number=14,
-        qualifying_pace=89, race_pace=90,
-        overtaking=88, defending=94, start_skill=90,
-        control=90, accuracy=92, tire_management=92,
-        experience=99, adaptability=96,
+    # ── George Russell — #63 (Mercedes) ──────────────────────────────
+    # Technical, metronomic, maximises the car on Saturdays
+    63: DriverProfile(
+        name="George Russell", number=63,
+        qualifying_pace=95, race_pace=93,
+        overtaking=86, defending=89, start_skill=90,
+        control=94, accuracy=93, tire_management=88,
+        experience=86, adaptability=91,
     ),
 
-    # ── Yuki Tsunoda — #22 ───────────────────────────────────────────
-    # Fast but occasionally error-prone, aggressive, improving
-    22: DriverProfile(
-        name="Yuki Tsunoda", number=22,
-        qualifying_pace=88, race_pace=86,
-        overtaking=84, defending=78, start_skill=82,
-        control=76, accuracy=80, tire_management=77,
-        experience=79, adaptability=83,
-    ),
-
-    # ── Carlos Sainz — #55 ───────────────────────────────────────────
-    # Very consistent, strong race pace, good tire management, reliable
-    55: DriverProfile(
-        name="Carlos Sainz", number=55,
-        qualifying_pace=90, race_pace=91,
-        overtaking=86, defending=88, start_skill=86,
-        control=90, accuracy=92, tire_management=90,
-        experience=88, adaptability=87,
-    ),
-
-    # ── Nico Hulkenberg — #27 ────────────────────────────────────────
-    # Experienced, consistent, solid defender, great in wet
-    27: DriverProfile(
-        name="Nico Hulkenberg", number=27,
-        qualifying_pace=87, race_pace=86,
-        overtaking=82, defending=86, start_skill=84,
-        control=88, accuracy=86, tire_management=84,
-        experience=88, adaptability=89,
-    ),
-
-    # ── Alexander Albon — #23 ────────────────────────────────────────
-    # Smooth driver, great tire management, solid all-round
-    23: DriverProfile(
-        name="Alexander Albon", number=23,
-        qualifying_pace=86, race_pace=87,
-        overtaking=84, defending=84, start_skill=83,
-        control=86, accuracy=88, tire_management=88,
-        experience=83, adaptability=84,
-    ),
-
-    # ── Pierre Gasly — #10 ───────────────────────────────────────────
-    # Quick, aggressive racer, good in wet, emotional under pressure
-    10: DriverProfile(
-        name="Pierre Gasly", number=10,
-        qualifying_pace=87, race_pace=86,
-        overtaking=85, defending=82, start_skill=82,
-        control=84, accuracy=84, tire_management=82,
-        experience=83, adaptability=87,
-    ),
-
-    # ── Esteban Ocon — #31 ───────────────────────────────────────────
-    # Solid defender, consistent, team player, medium pace
-    31: DriverProfile(
-        name="Esteban Ocon", number=31,
-        qualifying_pace=84, race_pace=84,
-        overtaking=80, defending=85, start_skill=80,
-        control=85, accuracy=84, tire_management=82,
-        experience=83, adaptability=85,
-    ),
-
-    # ── Kimi Antonelli — #12 ─────────────────────────────────────────
-    # Prodigious talent, raw speed, needs experience, can be wild
+    # ── Kimi Antonelli — #12 (Mercedes) ──────────────────────────────
+    # Prodigy in year two: genuinely quick, still raw in wheel-to-wheel
     12: DriverProfile(
         name="Kimi Antonelli", number=12,
-        qualifying_pace=90, race_pace=86,
-        overtaking=82, defending=75, start_skill=78,
-        control=73, accuracy=78, tire_management=75,
-        experience=69, adaptability=81,
+        qualifying_pace=92, race_pace=89,
+        overtaking=85, defending=79, start_skill=82,
+        control=79, accuracy=83, tire_management=80,
+        experience=74, adaptability=85,
     ),
 
-    # ── Liam Lawson — #30 ────────────────────────────────────────────
-    # Aggressive, fearless, raw, inconsistent
-    30: DriverProfile(
-        name="Liam Lawson", number=30,
-        qualifying_pace=84, race_pace=83,
-        overtaking=83, defending=78, start_skill=80,
-        control=76, accuracy=78, tire_management=76,
-        experience=72, adaptability=82,
+    # ── Fernando Alonso — #14 (Aston Martin) ─────────────────────────
+    # Supreme racecraft and cunning; the sport's canniest strategist
+    14: DriverProfile(
+        name="Fernando Alonso", number=14,
+        qualifying_pace=89, race_pace=91,
+        overtaking=90, defending=95, start_skill=91,
+        control=91, accuracy=92, tire_management=93,
+        experience=99, adaptability=97,
     ),
 
-    # ── Isack Hadjar — #6 ────────────────────────────────────────────
-    # Talented rookie, medium pace, still learning F1
-    6: DriverProfile(
-        name="Isack Hadjar", number=6,
-        qualifying_pace=83, race_pace=82,
-        overtaking=80, defending=76, start_skill=78,
-        control=78, accuracy=78, tire_management=75,
-        experience=70, adaptability=80,
-    ),
-
-    # ── Lance Stroll — #18 ───────────────────────────────────────────
-    # Strong in wet, inconsistent in dry, good starter, defends well
+    # ── Lance Stroll — #18 (Aston Martin) ────────────────────────────
     18: DriverProfile(
         name="Lance Stroll", number=18,
         qualifying_pace=82, race_pace=83,
-        overtaking=76, defending=82, start_skill=84,
+        overtaking=76, defending=82, start_skill=85,
         control=80, accuracy=79, tire_management=80,
-        experience=84, adaptability=82,
+        experience=86, adaptability=83,
     ),
 
-    # ── Oliver Bearman — #87 ─────────────────────────────────────────
-    # Young, brave, aggressive when opportunity comes, learning
+    # ── Carlos Sainz — #55 (Williams) ────────────────────────────────
+    # Mr Reliable: strong race pace, smart calls, rarely puts a foot wrong
+    55: DriverProfile(
+        name="Carlos Sainz", number=55,
+        qualifying_pace=90, race_pace=91,
+        overtaking=87, defending=89, start_skill=87,
+        control=91, accuracy=92, tire_management=91,
+        experience=91, adaptability=88,
+    ),
+
+    # ── Alexander Albon — #23 (Williams) ─────────────────────────────
+    23: DriverProfile(
+        name="Alexander Albon", number=23,
+        qualifying_pace=87, race_pace=88,
+        overtaking=85, defending=85, start_skill=84,
+        control=87, accuracy=89, tire_management=89,
+        experience=86, adaptability=85,
+    ),
+
+    # ── Isack Hadjar — #6 (Red Bull Racing) ──────────────────────────
+    # Earned the big-team seat with a standout sophomore season
+    6: DriverProfile(
+        name="Isack Hadjar", number=6,
+        qualifying_pace=88, race_pace=86,
+        overtaking=84, defending=80, start_skill=82,
+        control=82, accuracy=83, tire_management=80,
+        experience=75, adaptability=84,
+    ),
+
+    # ── Liam Lawson — #30 (Racing Bulls) ─────────────────────────────
+    # Fearless and combative, sometimes over the limit
+    30: DriverProfile(
+        name="Liam Lawson", number=30,
+        qualifying_pace=86, race_pace=85,
+        overtaking=85, defending=81, start_skill=82,
+        control=78, accuracy=80, tire_management=79,
+        experience=77, adaptability=84,
+    ),
+
+    # ── Arvid Lindblad — #41 (Racing Bulls) ──────────────────────────
+    # Teenage rookie: flashes of serious speed, plenty of rough edges
+    41: DriverProfile(
+        name="Arvid Lindblad", number=41,
+        qualifying_pace=85, race_pace=81,
+        overtaking=81, defending=73, start_skill=78,
+        control=72, accuracy=75, tire_management=73,
+        experience=62, adaptability=78,
+    ),
+
+    # ── Pierre Gasly — #10 (Alpine) ──────────────────────────────────
+    10: DriverProfile(
+        name="Pierre Gasly", number=10,
+        qualifying_pace=88, race_pace=87,
+        overtaking=85, defending=83, start_skill=83,
+        control=85, accuracy=85, tire_management=83,
+        experience=87, adaptability=88,
+    ),
+
+    # ── Franco Colapinto — #43 (Alpine) ──────────────────────────────
+    # Fast and fearless, still calming the crash rate
+    43: DriverProfile(
+        name="Franco Colapinto", number=43,
+        qualifying_pace=84, race_pace=83,
+        overtaking=82, defending=76, start_skill=80,
+        control=74, accuracy=78, tire_management=77,
+        experience=72, adaptability=80,
+    ),
+
+    # ── Esteban Ocon — #31 (Haas) ────────────────────────────────────
+    31: DriverProfile(
+        name="Esteban Ocon", number=31,
+        qualifying_pace=85, race_pace=85,
+        overtaking=81, defending=87, start_skill=81,
+        control=85, accuracy=85, tire_management=83,
+        experience=87, adaptability=86,
+    ),
+
+    # ── Oliver Bearman — #87 (Haas) ──────────────────────────────────
+    # Rapidly maturing: brave in battle, much cleaner in year two
     87: DriverProfile(
         name="Oliver Bearman", number=87,
-        qualifying_pace=83, race_pace=82,
-        overtaking=80, defending=76, start_skill=78,
-        control=77, accuracy=78, tire_management=74,
-        experience=71, adaptability=80,
+        qualifying_pace=86, race_pace=85,
+        overtaking=83, defending=79, start_skill=81,
+        control=80, accuracy=82, tire_management=79,
+        experience=75, adaptability=83,
     ),
 
-    # ── Gabriel Bortoleto — #5 ───────────────────────────────────────
-    # F2 champion, smooth, needs F1 adaptation time
+    # ── Nico Hulkenberg — #27 (Audi) ─────────────────────────────────
+    # Veteran anchor of the Audi works project; podium-proven at last
+    27: DriverProfile(
+        name="Nico Hulkenberg", number=27,
+        qualifying_pace=87, race_pace=86,
+        overtaking=82, defending=87, start_skill=85,
+        control=89, accuracy=87, tire_management=85,
+        experience=93, adaptability=90,
+    ),
+
+    # ── Gabriel Bortoleto — #5 (Audi) ────────────────────────────────
+    # Smooth F2 champion, impressive rookie year, keeps it clean
     5: DriverProfile(
         name="Gabriel Bortoleto", number=5,
-        qualifying_pace=82, race_pace=81,
-        overtaking=78, defending=75, start_skill=76,
-        control=78, accuracy=80, tire_management=78,
-        experience=68, adaptability=79,
+        qualifying_pace=85, race_pace=84,
+        overtaking=81, defending=79, start_skill=79,
+        control=83, accuracy=84, tire_management=83,
+        experience=73, adaptability=82,
     ),
 
-    # ── Jack Doohan — #7 ─────────────────────────────────────────────
-    # F2 graduate, learning, moderate pace, needs time
-    7: DriverProfile(
-        name="Jack Doohan", number=7,
-        qualifying_pace=81, race_pace=80,
-        overtaking=76, defending=74, start_skill=75,
-        control=76, accuracy=77, tire_management=76,
-        experience=68, adaptability=78,
+    # ── Sergio Perez — #11 (Cadillac) ────────────────────────────────
+    # Back from a year out to lead the new American team; tire specialist
+    11: DriverProfile(
+        name="Sergio Perez", number=11,
+        qualifying_pace=84, race_pace=87,
+        overtaking=85, defending=86, start_skill=82,
+        control=86, accuracy=86, tire_management=92,
+        experience=95, adaptability=86,
+    ),
+
+    # ── Valtteri Bottas — #77 (Cadillac) ─────────────────────────────
+    # Experienced benchmark, ultra-consistent, brings the team along
+    77: DriverProfile(
+        name="Valtteri Bottas", number=77,
+        qualifying_pace=85, race_pace=85,
+        overtaking=79, defending=83, start_skill=86,
+        control=88, accuracy=88, tire_management=86,
+        experience=95, adaptability=85,
     ),
 }
 

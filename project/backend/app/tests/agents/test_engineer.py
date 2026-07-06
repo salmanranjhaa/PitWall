@@ -62,7 +62,7 @@ class TestRaceEngineerAgent:
     def test_default_recommendation_is_info(self):
         agent = RaceEngineerAgent()
         state = make_race_state(lap=5, tire_age=3, tire_wear=0.1)
-        agent.perceive(1, state, getattr(state, "track", None))
+        agent.perceive(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         agent.deliberate()
         rec = agent.recommend()
         assert rec.priority == "INFO"
@@ -71,7 +71,7 @@ class TestRaceEngineerAgent:
     def test_tire_critical_recommends_pit(self):
         agent = RaceEngineerAgent()
         state = make_race_state(tire_wear=0.95, tire_age=20)
-        agent.perceive(1, state, getattr(state, "track", None))
+        agent.perceive(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         agent.deliberate()
         rec = agent.recommend()
         assert rec.priority == "URGENT"
@@ -81,7 +81,7 @@ class TestRaceEngineerAgent:
     def test_safety_car_recommends_pit(self):
         agent = RaceEngineerAgent()
         state = make_race_state(is_safety_car=True)
-        agent.perceive(1, state, getattr(state, "track", None))
+        agent.perceive(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         agent.deliberate()
         rec = agent.recommend()
         assert rec.priority == "URGENT"
@@ -91,7 +91,7 @@ class TestRaceEngineerAgent:
     def test_rain_recommends_wet_tires(self):
         agent = RaceEngineerAgent()
         state = make_race_state(rain_probability=0.8)
-        agent.perceive(1, state, getattr(state, "track", None))
+        agent.perceive(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         agent.deliberate()
         rec = agent.recommend()
         assert rec.priority == "URGENT"
@@ -102,7 +102,7 @@ class TestRaceEngineerAgent:
         agent = RaceEngineerAgent()
         state = make_race_state(lap=38, tire_compound="SOFT", tire_age=15, tire_wear=0.6)
         # Create beliefs with unmet obligation by forcing stints_completed empty
-        agent.perceive(1, state, getattr(state, "track", None))
+        agent.perceive(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         agent.deliberate()
         # Manually override to simulate unmet obligation
         agent.beliefs.stints_completed = []

@@ -36,7 +36,7 @@ const tireShort: Record<string, string> = {
 const teamColors: Record<string, string> = {
   "Red Bull Racing": "#1E41FF", "Mercedes": "#00D2BE", "Ferrari": "#FF1E00",
   "McLaren": "#FF8700", "Aston Martin": "#006F62", "Alpine": "#0090FF",
-  "Williams": "#00A0DE", "RB": "#1434CB", "Kick Sauber": "#A3A3A3", "Haas": "#B6BABD",
+  "Williams": "#00A0DE", "Racing Bulls": "#6692FF", "Audi": "#BB0A30", "Haas": "#B6BABD", "Cadillac": "#D4AF37",
 };
 
 const msgCfg: Record<string, { color: string; bg: string; border: string; Icon: typeof CheckCircle }> = {
@@ -402,8 +402,9 @@ function SCNotification({
 // ── speed controller ──────────────────────────────────────────────────────────
 
 const SPEED_OPTIONS = [1, 2, 5, 10, 20] as const;
-// Mirrors the backend _SPEED_TO_SLEEP map — seconds of real time per race lap
-const SPEED_SECONDS_PER_LAP: Record<number, number> = { 1: 10, 2: 6, 5: 3.5, 10: 1.5, 20: 0.5 };
+// Mirrors the backend _SPEED_TO_SLEEP map — seconds of real time per race lap.
+// 1x is deliberately slow (30s/lap) so the player can read data and make calls.
+const SPEED_SECONDS_PER_LAP: Record<number, number> = { 1: 30, 2: 15, 5: 6, 10: 3, 20: 1 };
 type SimSpeed = typeof SPEED_OPTIONS[number];
 
 // ── main component ────────────────────────────────────────────────────────────
@@ -1251,7 +1252,7 @@ export default function Dashboard() {
                 cars={leaderboard}
                 playerTeam={playerTeam}
                 className="h-56"
-                animDurationMs={(isPaused || phase === "FINISHED") ? 0 : Math.max(80, 2000 / simSpeed)}
+                animDurationMs={(isPaused || phase === "FINISHED") ? 0 : SPEED_SECONDS_PER_LAP[simSpeed] * 1000}
                 onLeaderLapCross={handleLeaderLapCross}
               />
             </div>

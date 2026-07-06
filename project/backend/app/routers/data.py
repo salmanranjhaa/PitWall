@@ -64,24 +64,35 @@ TRACK_DATABASE = {
     "baku":         {"name": "Baku City Circuit",                  "location": "Baku, Azerbaijan",         "length_km": 6.003, "laps": 51, "corners": 20, "type": "Street"},
     "singapore":    {"name": "Marina Bay Street Circuit",          "location": "Singapore",                "length_km": 4.940, "laps": 62, "corners": 23, "type": "Street"},
     "americas":     {"name": "Circuit of the Americas",            "location": "Austin, USA",              "length_km": 5.513, "laps": 56, "corners": 20, "type": "Road"},
+    "mexico_city":  {"name": "Autodromo Hermanos Rodriguez",       "location": "Mexico City, Mexico",      "length_km": 4.304, "laps": 71, "corners": 17, "type": "Road"},
+    "madrid":       {"name": "Madring",                            "location": "Madrid, Spain",            "length_km": 5.470, "laps": 57, "corners": 22, "type": "Street"},
     "interlagos":   {"name": "Autodromo Jose Carlos Pace",         "location": "Sao Paulo, Brazil",        "length_km": 4.309, "laps": 71, "corners": 15, "type": "Road"},
     "vegas":        {"name": "Las Vegas Strip Circuit",            "location": "Las Vegas, USA",           "length_km": 6.201, "laps": 50, "corners": 17, "type": "Street"},
     "losail":       {"name": "Lusail International Circuit",       "location": "Lusail, Qatar",            "length_km": 5.380, "laps": 57, "corners": 16, "type": "Road"},
     "yas_marina":   {"name": "Yas Marina Circuit",                 "location": "Abu Dhabi, UAE",           "length_km": 5.281, "laps": 58, "corners": 16, "type": "Road"},
 }
 
-TEAMS = [
-    {"name": "Red Bull Racing", "color": "#1E41FF", "drivers": ["Verstappen", "Perez"],     "team_id": "RBR"},
-    {"name": "Mercedes",        "color": "#00D2BE", "drivers": ["Hamilton", "Russell"],      "team_id": "MER"},
-    {"name": "Ferrari",         "color": "#FF1E00", "drivers": ["Leclerc", "Sainz"],         "team_id": "FER"},
-    {"name": "McLaren",         "color": "#FF8700", "drivers": ["Norris", "Piastri"],        "team_id": "MCL"},
-    {"name": "Aston Martin",    "color": "#006F62", "drivers": ["Alonso", "Stroll"],         "team_id": "AMR"},
-    {"name": "Alpine",          "color": "#0090FF", "drivers": ["Gasly", "Ocon"],            "team_id": "ALP"},
-    {"name": "Williams",        "color": "#00A0DE", "drivers": ["Albon", "Sargeant"],        "team_id": "WIL"},
-    {"name": "RB",              "color": "#1434CB", "drivers": ["Ricciardo", "Tsunoda"],     "team_id": "RBT"},
-    {"name": "Stake F1",        "color": "#000000", "drivers": ["Bottas", "Zhou"],           "team_id": "SAU"},
-    {"name": "Haas",            "color": "#B6BABD", "drivers": ["Hulkenberg", "Magnussen"],  "team_id": "HAA"},
-]
+# 2026 teams — derived from the simulation's driver database so the API,
+# qualifying roster, and race engine can never disagree about the grid.
+from simulation.ai_opponents import DRIVER_DATABASE, TEAM_INFO
+
+
+def _build_teams() -> List[Dict]:
+    teams: Dict[str, Dict] = {}
+    for d in DRIVER_DATABASE.values():
+        entry = teams.setdefault(d.team, {
+            "name": d.team,
+            "color": TEAM_INFO.get(d.team, {}).get("color", "#888888"),
+            "team_id": TEAM_INFO.get(d.team, {}).get("team_id", d.team[:3].upper()),
+            "drivers": [],
+            "driver_numbers": [],
+        })
+        entry["drivers"].append(d.name.split(" ")[-1])
+        entry["driver_numbers"].append(d.number)
+    return list(teams.values())
+
+
+TEAMS = _build_teams()
 
 COMPOUNDS = {
     "SOFT":         {"grip": 10, "durability": 3, "optimal_range_laps": "8-14",  "color": "#FF1E00", "warmup_laps": 1},

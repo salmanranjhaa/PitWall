@@ -85,7 +85,9 @@ class DesireSet:
                                   reason=f"must use 2nd compound, {ctx.laps_remaining}L left"))
 
         # ── Safety car / weather ─────────────────────────────────────
-        if ctx.is_safety_car:
+        # A cheap SC stop only makes sense on tires with meaningful age —
+        # nobody bins a 5-lap-old set just because the safety car is out.
+        if ctx.is_safety_car and (s.tire.age >= 10 or s.tire.wear > 0.35):
             # Risk-tolerant drivers value SC pit more highly
             sc_priority = 0.85 + personality.risk_tolerance * 0.05
             desires.append(Desire(GoalType.REACT_TO_SAFETY_CAR, sc_priority,
@@ -98,6 +100,13 @@ class DesireSet:
            s.tire.compound not in ("INTERMEDIATE", "WET"):
             desires.append(Desire(GoalType.REACT_TO_RAIN, 0.85,
                                   reason=f"rain {ctx.rain_probability:.0%} — switch compound"))
+
+        # Drying crossover: back to slicks once the racing line is dry.
+        # Adaptable drivers time the crossover more aggressively.
+        if s.tire.compound in ("INTERMEDIATE", "WET") and \
+           ctx.track_dampness < 0.10 and ctx.rain_probability < 0.25:
+            desires.append(Desire(GoalType.PIT_NOW, 0.88,
+                                  reason="track dry — crossover to slicks"))
 
         # ── Undercut defence ─────────────────────────────────────────
         # Experienced defenders detect undercuts from further back

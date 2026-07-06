@@ -1,9 +1,9 @@
 """
 F1 Qualifying Simulation Engine
 
-Simulates Q1 / Q2 / Q3 knockout format:
-  Q1: 18 min, 20 cars → P16-20 eliminated
-  Q2: 15 min, 15 cars → P11-15 eliminated
+Simulates the 2026 Q1 / Q2 / Q3 knockout format (22 cars):
+  Q1: 18 min, 22 cars → P17-22 eliminated
+  Q2: 15 min, 16 cars → P11-16 eliminated
   Q3: 12 min, top 10 → sets grid positions 1-10
 
 Key rules modelled:
@@ -21,31 +21,34 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
-# 2025 F1 driver roster — qualifying skill ratings (0–1 scale)
-# tier: Champion / Experienced / Midfield / Rookie
-# wet_skill: 0–1 scale (independent of dry skill)
+# Driver roster — derived from the sim's single source of truth
+# (simulation.ai_opponents.DRIVER_DATABASE) so qualifying, the race engine,
+# and the API can never disagree about who drives for whom.
+# tier: Champion / Experienced / Midfield / Rookie (from overall skill)
 # ---------------------------------------------------------------------------
+from .ai_opponents import DRIVER_DATABASE
+
+
+def _tier_for_skill(skill: float) -> str:
+    if skill >= 0.92:
+        return "Champion"
+    if skill >= 0.87:
+        return "Experienced"
+    if skill >= 0.84:
+        return "Midfield"
+    return "Rookie"
+
+
 DRIVER_ROSTER: List[Dict[str, Any]] = [
-    {"name": "Max Verstappen",    "number": 1,  "team": "Red Bull Racing", "skill": 0.990, "tier": "Champion",    "wet_skill": 0.99},
-    {"name": "Liam Lawson",       "number": 30, "team": "Red Bull Racing", "skill": 0.855, "tier": "Midfield",    "wet_skill": 0.84},
-    {"name": "Charles Leclerc",   "number": 16, "team": "Ferrari",         "skill": 0.975, "tier": "Champion",    "wet_skill": 0.94},
-    {"name": "Lewis Hamilton",    "number": 44, "team": "Ferrari",         "skill": 0.957, "tier": "Champion",    "wet_skill": 0.98},
-    {"name": "Lando Norris",      "number": 4,  "team": "McLaren",         "skill": 0.971, "tier": "Champion",    "wet_skill": 0.93},
-    {"name": "Oscar Piastri",     "number": 81, "team": "McLaren",         "skill": 0.946, "tier": "Experienced", "wet_skill": 0.91},
-    {"name": "George Russell",    "number": 63, "team": "Mercedes",        "skill": 0.937, "tier": "Experienced", "wet_skill": 0.90},
-    {"name": "Kimi Antonelli",    "number": 12, "team": "Mercedes",        "skill": 0.847, "tier": "Rookie",      "wet_skill": 0.83},
-    {"name": "Fernando Alonso",   "number": 14, "team": "Aston Martin",    "skill": 0.905, "tier": "Experienced", "wet_skill": 0.97},
-    {"name": "Lance Stroll",      "number": 18, "team": "Aston Martin",    "skill": 0.825, "tier": "Rookie",      "wet_skill": 0.80},
-    {"name": "Pierre Gasly",      "number": 10, "team": "Alpine",          "skill": 0.872, "tier": "Midfield",    "wet_skill": 0.87},
-    {"name": "Jack Doohan",       "number": 7,  "team": "Alpine",          "skill": 0.805, "tier": "Rookie",      "wet_skill": 0.79},
-    {"name": "Alexander Albon",   "number": 23, "team": "Williams",        "skill": 0.878, "tier": "Midfield",    "wet_skill": 0.87},
-    {"name": "Carlos Sainz",      "number": 55, "team": "Williams",        "skill": 0.942, "tier": "Experienced", "wet_skill": 0.92},
-    {"name": "Yuki Tsunoda",      "number": 22, "team": "RB",              "skill": 0.877, "tier": "Midfield",    "wet_skill": 0.86},
-    {"name": "Isack Hadjar",      "number": 6,  "team": "RB",              "skill": 0.821, "tier": "Rookie",      "wet_skill": 0.81},
-    {"name": "Nico Hulkenberg",   "number": 27, "team": "Kick Sauber",     "skill": 0.862, "tier": "Midfield",    "wet_skill": 0.88},
-    {"name": "Gabriel Bortoleto", "number": 5,  "team": "Kick Sauber",     "skill": 0.803, "tier": "Rookie",      "wet_skill": 0.79},
-    {"name": "Esteban Ocon",      "number": 31, "team": "Haas",            "skill": 0.871, "tier": "Midfield",    "wet_skill": 0.87},
-    {"name": "Oliver Bearman",    "number": 87, "team": "Haas",            "skill": 0.822, "tier": "Rookie",      "wet_skill": 0.81},
+    {
+        "name": d.name,
+        "number": d.number,
+        "team": d.team,
+        "skill": d.skill,
+        "tier": _tier_for_skill(d.skill),
+        "wet_skill": d.wet_skill,
+    }
+    for d in DRIVER_DATABASE.values()
 ]
 
 # Lap time penalty relative to SOFT (fastest compound)
@@ -59,9 +62,10 @@ COMPOUND_DELTA: Dict[str, float] = {
 TIRE_ALLOCATION: Dict[str, int] = {"SOFT": 8, "MEDIUM": 4, "HARD": 2}
 
 # Segment config
+# 2026 format: 22 cars, six eliminated in each of Q1 and Q2
 SEGMENT_CONFIG: Dict[str, Dict[str, int]] = {
-    "Q1": {"cars": 20, "eliminate": 5, "duration": 18 * 60, "ticks": 9},
-    "Q2": {"cars": 15, "eliminate": 5, "duration": 15 * 60, "ticks": 8},
+    "Q1": {"cars": 22, "eliminate": 6, "duration": 18 * 60, "ticks": 9},
+    "Q2": {"cars": 16, "eliminate": 6, "duration": 15 * 60, "ticks": 8},
     "Q3": {"cars": 10, "eliminate": 0, "duration": 12 * 60, "ticks": 6},
 }
 SEGMENTS = ["Q1", "Q2", "Q3"]

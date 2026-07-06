@@ -196,9 +196,13 @@ class PlanLibrary:
         Compound selection now accounts for personality:
         - Aggressive drivers pick SOFT more readily
         - Consistent drivers balance MEDIUM/HARD for long stints
+
+        Never returns the compound already fitted (unless weather forces it):
+        pitting onto the same rubber wastes the stop and — critically — can
+        never satisfy the two-compound rule, which used to trap agents in a
+        pit loop at the end of the race.
         """
         laps_remaining = beliefs.race_context.laps_remaining
-        stint_limits = {"SOFT": 22, "MEDIUM": 32, "HARD": 45}
 
         if beliefs.race_context.rain_probability > 0.65:
             return "WET"
@@ -210,7 +214,19 @@ class PlanLibrary:
         soft_bias = personality.aggression * 3 + personality.risk_tolerance * 2
 
         if laps_remaining <= 8 + soft_bias:
-            return "SOFT"
-        if laps_remaining <= 20 + soft_bias:
-            return "MEDIUM"
-        return "HARD"
+            choice = "SOFT"
+        elif laps_remaining <= 20 + soft_bias:
+            choice = "MEDIUM"
+        else:
+            choice = "HARD"
+
+        current = beliefs.self_belief.tire.compound
+        if choice == current and current in ("SOFT", "MEDIUM", "HARD"):
+            # Pick the nearest sensible alternative for the remaining distance
+            if current == "SOFT":
+                choice = "MEDIUM"
+            elif current == "HARD":
+                choice = "MEDIUM"
+            else:  # MEDIUM
+                choice = "SOFT" if laps_remaining <= 18 else "HARD"
+        return choice

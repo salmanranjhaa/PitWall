@@ -40,7 +40,7 @@ const tireColors: Record<string, string> = {
 const teamColors: Record<string, string> = {
   "Red Bull Racing": "#1E41FF", "Mercedes": "#00D2BE", "Ferrari": "#FF1E00",
   "McLaren": "#FF8700", "Aston Martin": "#006F62", "Alpine": "#0090FF",
-  "Williams": "#00A0DE", "RB": "#1434CB", "Kick Sauber": "#A3A3A3", "Haas": "#B6BABD",
+  "Williams": "#00A0DE", "Racing Bulls": "#6692FF", "Audi": "#BB0A30", "Haas": "#B6BABD", "Cadillac": "#D4AF37",
 };
 
 const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];

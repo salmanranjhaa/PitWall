@@ -14,7 +14,7 @@ const TRACK_KEY_MAP: Record<string, string> = {
   "Bahrain Grand Prix": "Bahrain", "Saudi Arabian Grand Prix": "Jeddah",
   "Australian Grand Prix": "Melbourne", "Japanese Grand Prix": "Suzuka",
   "Chinese Grand Prix": "Shanghai", "Miami Grand Prix": "Miami",
-  "Emilia Romagna Grand Prix": "Imola", "Monaco Grand Prix": "Monaco",
+  "Madrid Grand Prix": "Madrid", "Monaco Grand Prix": "Monaco",
   "Canadian Grand Prix": "Canada", "Spanish Grand Prix": "Spain",
   "Austrian Grand Prix": "Austria", "British Grand Prix": "Silverstone",
   "Hungarian Grand Prix": "Hungary", "Belgian Grand Prix": "Spa",
@@ -27,7 +27,7 @@ const TRACK_KEY_MAP: Record<string, string> = {
 
 const TRACK_SEVERITY: Record<string, number> = {
   "Bahrain": 8, "Jeddah": 5, "Melbourne": 6, "Suzuka": 7, "Shanghai": 7,
-  "Miami": 6, "Imola": 5, "Monaco": 3, "Canada": 4, "Spain": 5,
+  "Miami": 6, "Madrid": 6, "Monaco": 3, "Canada": 4, "Spain": 5,
   "Austria": 4, "Silverstone": 6, "Hungary": 5, "Spa": 4, "Zandvoort": 5,
   "Monza": 3, "Baku": 4, "Singapore": 4, "COTA": 7, "Mexico": 3,
   "Brazil": 5, "Las Vegas": 3, "Qatar": 7, "Abu Dhabi": 5,
@@ -229,7 +229,9 @@ export default function Setup() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedTrack, setSelectedTrack] = useState(TRACKS[13]); // Belgian GP default
+  const [selectedTrack, setSelectedTrack] = useState(
+    TRACKS.find((t) => t.name === "Belgian Grand Prix") ?? TRACKS[0],
+  );
   const [selectedTeam, setSelectedTeam] = useState<typeof TEAMS[number] | null>(null);
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyPlan | null>(null);

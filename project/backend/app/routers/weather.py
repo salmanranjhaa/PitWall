@@ -42,6 +42,7 @@ TRACK_COORDINATES: Dict[str, Tuple[float, float]] = {
     "Singapore":  (1.291,   103.863),
     "COTA":       (30.133,  -97.636),
     "Mexico":     (19.405,  -99.091),
+    "Madrid":     (40.468,   -3.616),
     "Brazil":     (-23.701, -46.697),
     "Las Vegas":  (36.113,  -115.173),
     "Qatar":      (25.490,   51.454),

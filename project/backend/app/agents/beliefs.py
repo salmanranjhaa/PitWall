@@ -233,11 +233,20 @@ class BeliefBase:
 
         self._prev_self_pits = self_car.pits
 
-        # Compound obligation: ≥2 dry compounds used
+        # Compound obligation: ≥2 dry compounds used. The rule is waived the
+        # moment wet-weather tires are used in the race (as in the real
+        # sporting regulations) — otherwise a wet race traps agents in an
+        # endless "must fit a second dry compound" pit loop.
         dry_compounds_used = {c for c in self.stints_completed if c in ("SOFT", "MEDIUM", "HARD")}
         if compound in ("SOFT", "MEDIUM", "HARD"):
             dry_compounds_used.add(compound)
-        compound_obligation_met = len(dry_compounds_used) >= 2 or laps_remaining <= 2
+        wet_running = (
+            compound in ("INTERMEDIATE", "WET")
+            or any(c in ("INTERMEDIATE", "WET") for c in self.stints_completed)
+        )
+        compound_obligation_met = (
+            len(dry_compounds_used) >= 2 or wet_running or laps_remaining <= 2
+        )
 
         # Trend tracking
         if self._prev_gap_ahead is not None and gap_ahead is not None:

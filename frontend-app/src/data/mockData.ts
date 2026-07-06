@@ -10,66 +10,75 @@ export interface TeamEntry {
   drivers: DriverEntry[];
 }
 
+// ── 2026 F1 grid — 11 teams / 22 cars ─────────────────────────────────────────
+// Must match the backend's DRIVER_DATABASE (simulation/ai_opponents.py):
+// same team names, driver names, and race numbers.
 export const TEAMS: TeamEntry[] = [
-  { name: "Red Bull Racing", color: "#1E41FF", code: "RBR", drivers: [
-    { name: "Max Verstappen", number: 1 },
-    { name: "Liam Lawson", number: 30 },
+  { name: "McLaren", color: "#FF8700", code: "MCL", drivers: [
+    { name: "Lando Norris", number: 1 },
+    { name: "Oscar Piastri", number: 81 },
   ]},
-  { name: "Mercedes", color: "#00D2BE", code: "MER", drivers: [
-    { name: "George Russell", number: 63 },
-    { name: "Kimi Antonelli", number: 12 },
+  { name: "Red Bull Racing", color: "#1E41FF", code: "RBR", drivers: [
+    { name: "Max Verstappen", number: 33 },
+    { name: "Isack Hadjar", number: 6 },
   ]},
   { name: "Ferrari", color: "#FF1E00", code: "FER", drivers: [
     { name: "Charles Leclerc", number: 16 },
     { name: "Lewis Hamilton", number: 44 },
   ]},
-  { name: "McLaren", color: "#FF8700", code: "MCL", drivers: [
-    { name: "Lando Norris", number: 4 },
-    { name: "Oscar Piastri", number: 81 },
+  { name: "Mercedes", color: "#00D2BE", code: "MER", drivers: [
+    { name: "George Russell", number: 63 },
+    { name: "Kimi Antonelli", number: 12 },
   ]},
-  { name: "Aston Martin", color: "#006F62", code: "AST", drivers: [
+  { name: "Aston Martin", color: "#006F62", code: "AMR", drivers: [
     { name: "Fernando Alonso", number: 14 },
     { name: "Lance Stroll", number: 18 },
   ]},
+  { name: "Williams", color: "#00A0DE", code: "WIL", drivers: [
+    { name: "Carlos Sainz", number: 55 },
+    { name: "Alexander Albon", number: 23 },
+  ]},
+  { name: "Racing Bulls", color: "#6692FF", code: "VRB", drivers: [
+    { name: "Liam Lawson", number: 30 },
+    { name: "Arvid Lindblad", number: 41 },
+  ]},
   { name: "Alpine", color: "#0090FF", code: "ALP", drivers: [
     { name: "Pierre Gasly", number: 10 },
-    { name: "Jack Doohan", number: 7 },
-  ]},
-  { name: "Williams", color: "#00A0DE", code: "WIL", drivers: [
-    { name: "Alexander Albon", number: 23 },
-    { name: "Carlos Sainz", number: 55 },
-  ]},
-  { name: "RB", color: "#1434CB", code: "RB", drivers: [
-    { name: "Yuki Tsunoda", number: 22 },
-    { name: "Isack Hadjar", number: 6 },
-  ]},
-  { name: "Kick Sauber", color: "#A3A3A3", code: "KCK", drivers: [
-    { name: "Nico Hulkenberg", number: 27 },
-    { name: "Gabriel Bortoleto", number: 5 },
+    { name: "Franco Colapinto", number: 43 },
   ]},
   { name: "Haas", color: "#B6BABD", code: "HAA", drivers: [
     { name: "Esteban Ocon", number: 31 },
     { name: "Oliver Bearman", number: 87 },
   ]},
+  { name: "Audi", color: "#BB0A30", code: "AUD", drivers: [
+    { name: "Nico Hulkenberg", number: 27 },
+    { name: "Gabriel Bortoleto", number: 5 },
+  ]},
+  { name: "Cadillac", color: "#D4AF37", code: "CAD", drivers: [
+    { name: "Sergio Perez", number: 11 },
+    { name: "Valtteri Bottas", number: 77 },
+  ]},
 ];
 
+// ── 2026 calendar — 24 rounds in season order ────────────────────────────────
+// Madrid (Madring) joins; Imola dropped.
 export const TRACKS = [
+  { name: "Australian Grand Prix", country: "Australia", flag: "AU", laps: 58 },
+  { name: "Chinese Grand Prix", country: "China", flag: "CN", laps: 56 },
+  { name: "Japanese Grand Prix", country: "Japan", flag: "JP", laps: 53 },
   { name: "Bahrain Grand Prix", country: "Bahrain", flag: "BH", laps: 57 },
   { name: "Saudi Arabian Grand Prix", country: "Saudi Arabia", flag: "SA", laps: 50 },
-  { name: "Australian Grand Prix", country: "Australia", flag: "AU", laps: 58 },
-  { name: "Japanese Grand Prix", country: "Japan", flag: "JP", laps: 53 },
-  { name: "Chinese Grand Prix", country: "China", flag: "CN", laps: 56 },
   { name: "Miami Grand Prix", country: "USA", flag: "US", laps: 57 },
-  { name: "Emilia Romagna Grand Prix", country: "Italy", flag: "IT", laps: 63 },
-  { name: "Monaco Grand Prix", country: "Monaco", flag: "MC", laps: 78 },
   { name: "Canadian Grand Prix", country: "Canada", flag: "CA", laps: 70 },
+  { name: "Monaco Grand Prix", country: "Monaco", flag: "MC", laps: 78 },
   { name: "Spanish Grand Prix", country: "Spain", flag: "ES", laps: 66 },
   { name: "Austrian Grand Prix", country: "Austria", flag: "AT", laps: 71 },
   { name: "British Grand Prix", country: "UK", flag: "GB", laps: 52 },
-  { name: "Hungarian Grand Prix", country: "Hungary", flag: "HU", laps: 70 },
   { name: "Belgian Grand Prix", country: "Belgium", flag: "BE", laps: 44 },
+  { name: "Hungarian Grand Prix", country: "Hungary", flag: "HU", laps: 70 },
   { name: "Dutch Grand Prix", country: "Netherlands", flag: "NL", laps: 72 },
   { name: "Italian Grand Prix", country: "Italy", flag: "IT", laps: 53 },
+  { name: "Madrid Grand Prix", country: "Spain", flag: "ES", laps: 57 },
   { name: "Azerbaijan Grand Prix", country: "Azerbaijan", flag: "AZ", laps: 51 },
   { name: "Singapore Grand Prix", country: "Singapore", flag: "SG", laps: 62 },
   { name: "United States Grand Prix", country: "USA", flag: "US", laps: 56 },
@@ -82,7 +91,7 @@ export const TRACKS = [
 
 export const LEADERBOARD_DATA = Array.from({ length: 15 }, (_, i) => ({
   id: i,
-  date: new Date(2024, 2 + Math.floor(i / 2), 15 + (i % 3) * 7).toISOString().split('T')[0],
+  date: new Date(2026, 2 + Math.floor(i / 2), 15 + (i % 3) * 7).toISOString().split('T')[0],
   track: TRACKS[i % TRACKS.length].name,
   team: TEAMS[i % TEAMS.length].name,
   position: (i % 5) + 1,
@@ -151,21 +160,22 @@ export const POSITION_HISTORY = Array.from({ length: 44 }, (_, lap) => ({
   Williams: 5 + (Math.random() * 0.2),
 }));
 
+// Illustrative 2026 mid-season standings (after ~12 of 24 rounds)
 export const DRIVER_STANDINGS = [
-  { position: 1, driver: "Max Verstappen", team: "Red Bull Racing", points: 437, wins: 8, podiums: 14 },
-  { position: 2, driver: "Lando Norris", team: "McLaren", points: 374, wins: 5, podiums: 13 },
-  { position: 3, driver: "Charles Leclerc", team: "Ferrari", points: 356, wins: 4, podiums: 11 },
-  { position: 4, driver: "Oscar Piastri", team: "McLaren", points: 290, wins: 3, podiums: 9 },
-  { position: 5, driver: "Carlos Sainz", team: "Williams", points: 240, wins: 1, podiums: 7 },
-  { position: 6, driver: "George Russell", team: "Mercedes", points: 211, wins: 1, podiums: 6 },
-  { position: 7, driver: "Lewis Hamilton", team: "Ferrari", points: 198, wins: 1, podiums: 6 },
-  { position: 8, driver: "Fernando Alonso", team: "Aston Martin", points: 162, wins: 0, podiums: 4 },
+  { position: 1, driver: "Max Verstappen", team: "Red Bull Racing", points: 216, wins: 6, podiums: 10 },
+  { position: 2, driver: "Lando Norris", team: "McLaren", points: 198, wins: 3, podiums: 9 },
+  { position: 3, driver: "Oscar Piastri", team: "McLaren", points: 173, wins: 2, podiums: 8 },
+  { position: 4, driver: "George Russell", team: "Mercedes", points: 148, wins: 1, podiums: 6 },
+  { position: 5, driver: "Charles Leclerc", team: "Ferrari", points: 132, wins: 0, podiums: 5 },
+  { position: 6, driver: "Lewis Hamilton", team: "Ferrari", points: 118, wins: 0, podiums: 4 },
+  { position: 7, driver: "Fernando Alonso", team: "Aston Martin", points: 96, wins: 0, podiums: 3 },
+  { position: 8, driver: "Kimi Antonelli", team: "Mercedes", points: 74, wins: 0, podiums: 1 },
 ];
 
 export const CONSTRUCTOR_STANDINGS = [
-  { position: 1, team: "Red Bull Racing", points: 860, wins: 21 },
-  { position: 2, team: "Mercedes", points: 657, wins: 4 },
-  { position: 3, team: "Ferrari", points: 646, wins: 3 },
-  { position: 4, team: "McLaren", points: 532, wins: 1 },
-  { position: 5, team: "Aston Martin", points: 289, wins: 0 },
+  { position: 1, team: "McLaren", points: 371, wins: 5 },
+  { position: 2, team: "Red Bull Racing", points: 262, wins: 6 },
+  { position: 3, team: "Ferrari", points: 250, wins: 0 },
+  { position: 4, team: "Mercedes", points: 222, wins: 1 },
+  { position: 5, team: "Aston Martin", points: 141, wins: 0 },
 ];

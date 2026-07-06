@@ -10,9 +10,10 @@ const TEAM_COLORS: Record<string, string> = {
   "Aston Martin": "#006F62",
   "Alpine": "#0090FF",
   "Williams": "#00A0DE",
-  "RB": "#1434CB",
-  "Kick Sauber": "#A3A3A3",
+  "Racing Bulls": "#6692FF",
+  "Audi": "#BB0A30",
   "Haas": "#B6BABD",
+  "Cadillac": "#D4AF37",
 };
 
 const TIRE_COLORS: Record<string, string> = {

@@ -76,14 +76,19 @@ export const getStoredUser = (): AuthUser | null => {
 
 export const isLoggedIn = (): boolean => getToken() !== null;
 
+/** Fired on window whenever the session is created or destroyed. */
+export const AUTH_CHANGED_EVENT = "pitwall-auth-changed";
+
 function storeSession(token: string, user: AuthUser) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 // ── fetch helpers ────────────────────────────────────────────────────────────

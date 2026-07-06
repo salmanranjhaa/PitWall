@@ -387,7 +387,7 @@ class MCTSStrategyPlanner:
         if position > 1 and gap_ahead <= 0.15:
             position -= 1
             gap_ahead = self._rng.uniform(0.8, 2.5)
-        if position < 20 and gap_behind <= 0.10:
+        if position < 22 and gap_behind <= 0.10:
             position += 1
             gap_behind = self._rng.uniform(0.7, 2.2)
 
@@ -405,7 +405,7 @@ class MCTSStrategyPlanner:
         if not state.dry_rule_met() and state.compound in DRY_COMPOUNDS:
             projected_position += 8
 
-        projected_position = max(1, min(20, projected_position))
+        projected_position = max(1, min(22, projected_position))
         points = POINTS_BY_POSITION.get(projected_position, 0)
         position_score = (21 - projected_position) * 0.8
         time_score = -state.own_time / 18.0
@@ -423,7 +423,7 @@ class MCTSStrategyPlanner:
         return SearchState(
             current_lap=int(race_state.get("current_lap", 1)),
             total_laps=int(race_state.get("total_laps", 57)),
-            position=max(1, min(20, int(race_state.get("current_position", 10)))),
+            position=max(1, min(22, int(race_state.get("current_position", 10)))),
             compound=compound,
             tire_age=max(0, int(race_state.get("tire_age", 0))),
             fuel=max(5.0, float(race_state.get("fuel_remaining_kg", 50.0))),

@@ -64,7 +64,8 @@ class TestDesireSet:
         assert desires[0].priority >= 0.9
 
     def test_safety_car_triggers_react(self):
-        b = make_beliefs(is_safety_car=True)
+        # SC pit evaluation only fires on meaningfully aged tires
+        b = make_beliefs(is_safety_car=True, tire_age=14, tire_wear=0.45)
         ds = DesireSet()
         desires = ds.deliberate(b, get_personality(1))
         assert any(d.goal == GoalType.REACT_TO_SAFETY_CAR for d in desires)
@@ -96,7 +97,7 @@ class TestDesireSet:
     def test_different_personalities_produce_different_priorities(self):
         b = make_beliefs(gap_ahead=0.4)
         ds = DesireSet()
-        ver_desires = ds.deliberate(b, get_personality(1))
+        ver_desires = ds.deliberate(b, get_personality(33))
         ham_desires = ds.deliberate(b, get_personality(44))
         # VER is more aggressive — GAIN_POSITION should have higher priority
         ver_gain = next((d for d in ver_desires if d.goal == GoalType.GAIN_POSITION), None)

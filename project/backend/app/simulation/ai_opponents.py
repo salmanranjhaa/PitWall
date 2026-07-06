@@ -58,84 +58,109 @@ class Driver:
 
 
 # =============================================================================
-# 2024 F1 DRIVER DATABASE
+# 2026 F1 DRIVER DATABASE — single source of truth for the whole sim
+# (qualifying roster and /api/data/teams are derived from this table)
 # =============================================================================
+# 2026 grid: 11 teams / 22 cars. Cadillac joins; Sauber becomes Audi.
+# Norris carries #1 as reigning champion; Verstappen reverts to #33.
 
 DRIVER_DATABASE: Dict[str, Driver] = {
-    # Red Bull Racing — Verstappen + Tsunoda (2025)
-    "VER": Driver("Max Verstappen", "Red Bull Racing", 1,
-                   skill=0.97, aggression=0.75, consistency=0.96, wet_skill=0.94, base_pace=88.0),
-    "TSU": Driver("Yuki Tsunoda", "Red Bull Racing", 22,
-                  skill=0.85, aggression=0.84, consistency=0.78, wet_skill=0.83, base_pace=88.6),
-
-    # Mercedes — Russell + Antonelli (2025)
-    "RUS": Driver("George Russell", "Mercedes", 63,
-                  skill=0.91, aggression=0.79, consistency=0.89, wet_skill=0.88, base_pace=88.3),
-    "ANT": Driver("Kimi Antonelli", "Mercedes", 12,
-                  skill=0.84, aggression=0.76, consistency=0.80, wet_skill=0.83, base_pace=88.7),
-
-    # Ferrari — Leclerc + Hamilton (2025)
-    "LEC": Driver("Charles Leclerc", "Ferrari", 16,
-                  skill=0.94, aggression=0.83, consistency=0.86, wet_skill=0.85, base_pace=87.8),
-    "HAM": Driver("Lewis Hamilton", "Ferrari", 44,
-                  skill=0.95, aggression=0.72, consistency=0.94, wet_skill=0.97, base_pace=87.9),
-
-    # McLaren — Norris + Piastri (2025, unchanged)
-    "NOR": Driver("Lando Norris", "McLaren", 4,
-                  skill=0.94, aggression=0.77, consistency=0.90, wet_skill=0.91, base_pace=87.7),
+    # McLaren — reigning champions
+    "NOR": Driver("Lando Norris", "McLaren", 1,
+                  skill=0.95, aggression=0.77, consistency=0.92, wet_skill=0.92, base_pace=87.7),
     "PIA": Driver("Oscar Piastri", "McLaren", 81,
-                  skill=0.91, aggression=0.71, consistency=0.88, wet_skill=0.85, base_pace=87.9),
+                  skill=0.94, aggression=0.72, consistency=0.93, wet_skill=0.88, base_pace=87.7),
 
-    # Aston Martin — Alonso + Stroll (2025, unchanged)
+    # Red Bull Racing — Verstappen + Hadjar (promoted from Racing Bulls)
+    "VER": Driver("Max Verstappen", "Red Bull Racing", 33,
+                  skill=0.99, aggression=0.78, consistency=0.98, wet_skill=0.99, base_pace=88.0),
+    "HAD": Driver("Isack Hadjar", "Red Bull Racing", 6,
+                  skill=0.86, aggression=0.78, consistency=0.82, wet_skill=0.83, base_pace=88.6),
+
+    # Ferrari — Leclerc + Hamilton
+    "LEC": Driver("Charles Leclerc", "Ferrari", 16,
+                  skill=0.95, aggression=0.83, consistency=0.87, wet_skill=0.90, base_pace=87.9),
+    "HAM": Driver("Lewis Hamilton", "Ferrari", 44,
+                  skill=0.94, aggression=0.74, consistency=0.95, wet_skill=0.98, base_pace=87.9),
+
+    # Mercedes — Russell + Antonelli
+    "RUS": Driver("George Russell", "Mercedes", 63,
+                  skill=0.93, aggression=0.76, consistency=0.93, wet_skill=0.90, base_pace=87.9),
+    "ANT": Driver("Kimi Antonelli", "Mercedes", 12,
+                  skill=0.88, aggression=0.77, consistency=0.84, wet_skill=0.87, base_pace=88.3),
+
+    # Aston Martin — Honda works power + Newey design bump for 2026
     "ALO": Driver("Fernando Alonso", "Aston Martin", 14,
-                  skill=0.93, aggression=0.80, consistency=0.90, wet_skill=0.96, base_pace=89.2),
+                  skill=0.92, aggression=0.80, consistency=0.92, wet_skill=0.97, base_pace=88.4),
     "STR": Driver("Lance Stroll", "Aston Martin", 18,
-                  skill=0.80, aggression=0.68, consistency=0.78, wet_skill=0.82, base_pace=90.0),
+                  skill=0.81, aggression=0.68, consistency=0.79, wet_skill=0.84, base_pace=89.1),
 
-    # Alpine — Gasly + Doohan (2025)
-    "GAS": Driver("Pierre Gasly", "Alpine", 10,
-                  skill=0.86, aggression=0.78, consistency=0.82, wet_skill=0.87, base_pace=89.7),
-    "DOO": Driver("Jack Doohan", "Alpine", 7,
-                  skill=0.80, aggression=0.73, consistency=0.77, wet_skill=0.78, base_pace=90.2),
-
-    # Williams — Albon + Sainz (2025, Sainz moved from Ferrari)
-    "ALB": Driver("Alexander Albon", "Williams", 23,
-                  skill=0.87, aggression=0.73, consistency=0.85, wet_skill=0.84, base_pace=89.5),
+    # Williams — Sainz + Albon
     "SAI": Driver("Carlos Sainz", "Williams", 55,
-                  skill=0.91, aggression=0.75, consistency=0.91, wet_skill=0.87, base_pace=89.5),
+                  skill=0.91, aggression=0.75, consistency=0.92, wet_skill=0.89, base_pace=88.8),
+    "ALB": Driver("Alexander Albon", "Williams", 23,
+                  skill=0.88, aggression=0.73, consistency=0.87, wet_skill=0.85, base_pace=88.9),
 
-    # RB (Racing Bulls) — Lawson + Hadjar (2025)
-    "LAW": Driver("Liam Lawson", "RB", 30,
-                  skill=0.84, aggression=0.80, consistency=0.79, wet_skill=0.82, base_pace=90.0),
-    "HAD": Driver("Isack Hadjar", "RB", 6,
-                  skill=0.83, aggression=0.77, consistency=0.78, wet_skill=0.80, base_pace=90.2),
+    # Racing Bulls — Lawson + Lindblad
+    "LAW": Driver("Liam Lawson", "Racing Bulls", 30,
+                  skill=0.85, aggression=0.81, consistency=0.80, wet_skill=0.84, base_pace=89.3),
+    "LIN": Driver("Arvid Lindblad", "Racing Bulls", 41,
+                  skill=0.81, aggression=0.79, consistency=0.75, wet_skill=0.79, base_pace=89.7),
 
-    # Sauber — Hulkenberg + Bortoleto (2025, Audi project)
-    "HUL": Driver("Nico Hulkenberg", "Sauber", 27,
-                  skill=0.86, aggression=0.71, consistency=0.84, wet_skill=0.89, base_pace=90.3),
-    "BOR": Driver("Gabriel Bortoleto", "Sauber", 5,
-                  skill=0.84, aggression=0.74, consistency=0.80, wet_skill=0.82, base_pace=90.5),
+    # Alpine — Gasly + Colapinto
+    "GAS": Driver("Pierre Gasly", "Alpine", 10,
+                  skill=0.87, aggression=0.78, consistency=0.84, wet_skill=0.89, base_pace=89.5),
+    "COL": Driver("Franco Colapinto", "Alpine", 43,
+                  skill=0.82, aggression=0.80, consistency=0.77, wet_skill=0.80, base_pace=89.9),
 
-    # Haas — Bearman + Ocon (2025)
-    "BEA": Driver("Oliver Bearman", "Haas", 87,
-                  skill=0.83, aggression=0.75, consistency=0.79, wet_skill=0.80, base_pace=90.2),
+    # Haas — Ocon + Bearman
     "OCO": Driver("Esteban Ocon", "Haas", 31,
-                  skill=0.85, aggression=0.76, consistency=0.83, wet_skill=0.86, base_pace=90.3),
+                  skill=0.85, aggression=0.76, consistency=0.85, wet_skill=0.87, base_pace=89.6),
+    "BEA": Driver("Oliver Bearman", "Haas", 87,
+                  skill=0.85, aggression=0.78, consistency=0.81, wet_skill=0.82, base_pace=89.7),
+
+    # Audi — works team debut (formerly Sauber)
+    "HUL": Driver("Nico Hulkenberg", "Audi", 27,
+                  skill=0.86, aggression=0.71, consistency=0.86, wet_skill=0.90, base_pace=89.9),
+    "BOR": Driver("Gabriel Bortoleto", "Audi", 5,
+                  skill=0.85, aggression=0.75, consistency=0.83, wet_skill=0.83, base_pace=90.0),
+
+    # Cadillac — new entry for 2026, veteran pairing
+    "PER": Driver("Sergio Perez", "Cadillac", 11,
+                  skill=0.86, aggression=0.72, consistency=0.85, wet_skill=0.84, base_pace=90.3),
+    "BOT": Driver("Valtteri Bottas", "Cadillac", 77,
+                  skill=0.85, aggression=0.68, consistency=0.87, wet_skill=0.86, base_pace=90.4),
 }
 
-# Team base pace — 2024-2025 competitive order (lower = faster)
-# McLaren and Ferrari swapped Red Bull at the top; Aston Martin fell from 2023 peak
+# Team base pace — plausible 2026 pecking order under the new regulations
+# (lower = faster). New entries Audi and Cadillac start at the back.
 TEAM_BASE_PACE: Dict[str, float] = {
-    "McLaren": 87.7,       # Fastest car 2024-2025
-    "Ferrari": 87.8,       # LEC+HAM combination
-    "Red Bull Racing": 88.0,  # Still formidable but fell from 2023 dominance
-    "Mercedes": 88.3,      # Recovering
-    "Aston Martin": 89.2,  # Fell off after 2023 peak
-    "Williams": 89.5,      # Sainz boost
-    "Alpine": 89.7,
-    "RB": 90.0,
-    "Sauber": 90.3,
-    "Haas": 90.2,
+    "McLaren": 87.7,          # Reigning champions
+    "Ferrari": 87.9,
+    "Mercedes": 87.9,         # Strong 2026 power unit
+    "Red Bull Racing": 87.9,  # First year of in-house RBPT-Ford engine
+    "Aston Martin": 88.4,     # Newey car + Honda works deal
+    "Williams": 88.8,
+    "Racing Bulls": 89.3,
+    "Alpine": 89.5,           # Customer Mercedes power
+    "Haas": 89.6,
+    "Audi": 89.9,             # Works team debut
+    "Cadillac": 90.3,         # Brand-new entry
+}
+
+# Team metadata shared with the API layer (colors, short codes, 2026 identity)
+TEAM_INFO: Dict[str, Dict[str, str]] = {
+    "McLaren":         {"color": "#FF8700", "team_id": "MCL"},
+    "Ferrari":         {"color": "#FF1E00", "team_id": "FER"},
+    "Mercedes":        {"color": "#00D2BE", "team_id": "MER"},
+    "Red Bull Racing": {"color": "#1E41FF", "team_id": "RBR"},
+    "Aston Martin":    {"color": "#006F62", "team_id": "AMR"},
+    "Williams":        {"color": "#00A0DE", "team_id": "WIL"},
+    "Racing Bulls":    {"color": "#6692FF", "team_id": "VRB"},
+    "Alpine":          {"color": "#0090FF", "team_id": "ALP"},
+    "Haas":            {"color": "#B6BABD", "team_id": "HAA"},
+    "Audi":            {"color": "#BB0A30", "team_id": "AUD"},
+    "Cadillac":        {"color": "#D4AF37", "team_id": "CAD"},
 }
 
 
@@ -476,7 +501,7 @@ class AIOpponentController:
         prob = 0.18
 
         # Skill and aggression
-        prob += (driver.skill - target.skill) * 0.30
+        prob += (driver.skill - target.skill) * 0.55
         prob += driver.aggression * 0.08
 
         # Track difficulty (Monaco=10 → massive penalty; Austria=3 → mild)

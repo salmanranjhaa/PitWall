@@ -87,7 +87,7 @@ class TestBeliefBase:
                 pit_loss_time=20.0, undercut_value=12.0,
             ),
         )
-        bb.update_from_state(1, state, getattr(state, "track", None))
+        bb.update_from_state(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
 
         assert bb.self_belief.position == 1
         assert bb.self_belief.tire.compound == "SOFT"
@@ -112,7 +112,7 @@ class TestBeliefBase:
                 pit_loss_time=20.0, undercut_value=12.0,
             ),
         )
-        bb.update_from_state(1, state, getattr(state, "track", None))
+        bb.update_from_state(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
 
         assert len(bb.rivals) == 1
         rival = bb.rivals[44]
@@ -137,7 +137,7 @@ class TestBeliefBase:
                 pit_loss_time=20.0, undercut_value=12.0,
             ),
         )
-        bb.update_from_state(1, state, getattr(state, "track", None))
+        bb.update_from_state(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
 
         assert bb.race_context.current_lap == 10
         assert bb.race_context.total_laps == 50
@@ -161,6 +161,6 @@ class TestBeliefBase:
                 pit_loss_time=20.0, undercut_value=12.0,
             ),
         )
-        bb.update_from_state(1, state, getattr(state, "track", None))
+        bb.update_from_state(DRIVER_DATABASE["VER"].number, state, getattr(state, "track", None))
         # Only SOFT used so far, obligation not met with many laps remaining
         assert bb.self_belief.compound_obligation_met is False

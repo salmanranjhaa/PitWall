@@ -97,7 +97,7 @@ class TestDriverAgent:
         agent.deliberate()
         agent.select_plan()
         action = agent.execute()
-        assert action.driver_number == 1
+        assert action.driver_number == DRIVER_DATABASE["VER"].number
         assert action.action_type is not None
         assert action.top_desire is not None
 
@@ -109,14 +109,14 @@ class TestDriverAgent:
         agent.select_plan()
         agent.execute()
         export = agent.bdi_state()
-        assert export["driver_number"] == 1
+        assert export["driver_number"] == DRIVER_DATABASE["VER"].number
         assert "top_desire" in export
         assert "current_plan" in export
 
     def test_hamilton_and_tsunoda_differ(self):
         state = make_race_state()
         ham = DriverAgent(DRIVER_DATABASE["HAM"], random.Random(42))
-        tsu = DriverAgent(DRIVER_DATABASE["TSU"], random.Random(42))
+        tsu = DriverAgent(DRIVER_DATABASE["LIN"], random.Random(42))
 
         ham.perceive(state)
         ham.deliberate()

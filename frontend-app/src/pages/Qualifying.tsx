@@ -16,7 +16,7 @@ import {
 const teamColors: Record<string, string> = {
   "Red Bull Racing": "#1E41FF", "Mercedes": "#00D2BE", "Ferrari": "#FF1E00",
   "McLaren": "#FF8700", "Aston Martin": "#006F62", "Alpine": "#0090FF",
-  "Williams": "#00A0DE", "RB": "#1434CB", "Kick Sauber": "#A3A3A3", "Haas": "#B6BABD",
+  "Williams": "#00A0DE", "Racing Bulls": "#6692FF", "Audi": "#BB0A30", "Haas": "#B6BABD", "Cadillac": "#D4AF37",
 };
 
 const tireColors: Record<string, string> = {
@@ -32,16 +32,17 @@ const TIER_COLORS: Record<string, string> = {
 
 // Flavor text shown in driver profile
 const DRIVER_STYLES: Record<string, string> = {
-  Verstappen: "All-Rounder",      Leclerc: "Qualifying Ace",
-  Hamilton:   "Race Craft Master", Norris: "Raw Speed",
-  Piastri:    "Consistent",        Russell: "Technical",
-  Sainz:      "Strategic",         Alonso: "Veteran",
+  Verstappen: "Generational",      Leclerc: "Qualifying Ace",
+  Hamilton:   "Race Craft Master", Norris: "Reigning Champion",
+  Piastri:    "Ice Cold",          Russell: "Technical",
+  Sainz:      "Strategic",         Alonso: "Veteran Fox",
   Antonelli:  "Rising Star",       Stroll: "Variable",
-  Gasly:      "Street Fighter",    Doohan: "Developing",
-  Albon:      "Tire Whisperer",    Tsunoda: "Aggressive",
-  Lawson:     "Calculated",        Hadjar: "Promising",
-  Hulkenberg: "Consistent",        Bortoleto: "Potential",
-  Ocon:       "Battler",           Bearman: "Promising",
+  Gasly:      "Street Fighter",    Colapinto: "Fearless",
+  Albon:      "Tire Whisperer",    Lindblad: "Teen Prodigy",
+  Lawson:     "Combative",         Hadjar: "Fast Riser",
+  Hulkenberg: "Consistent",        Bortoleto: "Smooth Operator",
+  Ocon:       "Battler",           Bearman: "Brave",
+  Perez:      "Tire Specialist",   Bottas: "Metronome",
 };
 
 // Weekend allocation (must match backend TIRE_ALLOCATION)
@@ -52,8 +53,8 @@ const SEGMENT_COLORS: Record<string, string> = {
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
-  Q1: "Q1 — Knockout (20 cars)",
-  Q2: "Q2 — Knockout (15 cars)",
+  Q1: "Q1 — Knockout (22 cars)",
+  Q2: "Q2 — Knockout (16 cars)",
   Q3: "Q3 — Pole Shootout (10 cars)",
 };
 

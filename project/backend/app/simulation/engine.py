@@ -323,9 +323,8 @@ class RaceEngine:
         where skill_modifier gives top drivers up to ~2 s advantage and noise
         is tight (sigma=0.06 s) as qualifying is more controlled than race pace.
 
-        Q1: all 20, bottom 5 eliminated (P16-P20).
-        Q2: top 15, bottom 5 eliminated (P11-P15).
-        Q3: top 10 set final grid (P1-P10).
+        2026 format (22 cars): Q1 eliminates the bottom 6 (P17-P22),
+        Q2 eliminates the next 6 (P11-P16), Q3 top 10 set P1-P10.
 
         Returns:
             Drivers in qualifying order (index 0 = pole).
@@ -335,23 +334,13 @@ class RaceEngine:
         for driver in all_drivers:
             base = TEAM_BASE_PACE.get(driver.team, 90.0)
             # Best drivers gain up to ~2 s vs weakest; sigma 0.06 s = qualifying precision
-            skill_mod = -(driver.skill - 0.85) * 2.5
+            skill_mod = -(driver.skill - 0.85) * 4.0
             noise = self._rng.gauss(0.0, 0.06)
             q_times[driver.number] = base + skill_mod + noise
 
-        sorted_all = sorted(all_drivers, key=lambda d: q_times[d.number])
-
-        # Q1 elimination: bottom 5 keep their Q1 positions but don't improve
-        q2_field = sorted_all[:15]
-        q1_eliminated = sorted_all[15:]  # P16-P20
-
-        # Q2 elimination
-        q3_field = sorted_all[:10]
-        q2_eliminated = sorted_all[10:15]  # P11-P15
-
-        # Assign grid: Q3 first (fastest to slowest), then Q2 elim, then Q1 elim
-        grid = q3_field + q2_eliminated + q1_eliminated
-        return grid
+        # Grid order equals the overall sorted order: Q3 top 10 first, then
+        # Q2 eliminations, then Q1 eliminations — which is the sorted list.
+        return sorted(all_drivers, key=lambda d: q_times[d.number])
 
     def _ai_starting_compound(self, qualifying_pos: int) -> str:
         """
@@ -364,9 +353,12 @@ class RaceEngine:
         severity = self.track.tire_severity
 
         if severity >= 7:
-            if qualifying_pos <= 5:
+            # Most of the field starts MEDIUM; only the back third gambles on
+            # a long HARD first stint (a uniform P6+ HARD start proved to be
+            # a dominant strategy artifact, not realism).
+            if qualifying_pos <= 12:
                 return "MEDIUM"
-            return "HARD"
+            return self._rng.choice(["MEDIUM", "HARD"])
         elif severity >= 4:
             if qualifying_pos <= 5:
                 # Front runners: aggressive SOFT for early lead, plan early pit
@@ -440,7 +432,7 @@ class RaceEngine:
 
             # Build blended engine: team-specific base pace, ML tire degradation
             base_pace = TEAM_BASE_PACE.get(driver.team, 90.0)
-            base_pace -= (driver.skill - 0.85) * 2.0  # top driver ~0.24 s faster than midfield
+            base_pace -= (driver.skill - 0.85) * 4.0  # elite drivers overcome car deficits
 
             car_physics = CarPhysics(
                 team=driver.team,
@@ -1102,8 +1094,13 @@ class RaceEngine:
             success = raw_success and self._rng.random() < defend_factor
 
         if success:
-            overtake_bonus = 0.4 + self._rng.random() * 0.4
-            attacker.total_time = defender.total_time - overtake_bonus
+            # Swap positions without manufacturing race time: the attacker
+            # slots just ahead, the defender loses a little time in the
+            # battle. (The old 0.4-0.8s bonus let fast midfield starters
+            # harvest free seconds with every pass.)
+            margin = 0.10 + self._rng.random() * 0.15
+            attacker.total_time = defender.total_time - margin
+            defender.total_time += 0.20
 
             self._overtake_cooldown[pair_key] = self._current_lap
             self._overtake_cooldown[(defender.driver.number, attacker.driver.number)] = self._current_lap
@@ -1298,9 +1295,10 @@ class RaceEngine:
                 )
 
                 if success:
-                    # Swap: give attacker meaningful gap so they hold position
-                    overtake_bonus = 0.4 + self._rng.random() * 0.4  # 0.4–0.8 s
-                    attacker.total_time = defender.total_time - overtake_bonus
+                    # Swap without manufacturing race time (see agent path)
+                    margin = 0.10 + self._rng.random() * 0.15
+                    attacker.total_time = defender.total_time - margin
+                    defender.total_time += 0.20
                     overtakes_this_lap += 1
 
                     self._overtake_cooldown[pair_key] = self._current_lap
@@ -1699,14 +1697,16 @@ class RaceEngine:
 
     def _check_track_limits(self, car: "CarState") -> bool:
         """Return True if the car exceeded track limits this lap."""
-        # Street circuits (walls) have very low violation tendency
+        # Street circuits (walls) have very low violation tendency.
+        # Calibrated for a handful of violations per race across the field,
+        # not one per driver per stint.
         is_street = any(k in self.track.name.lower()
-                        for k in ("monaco", "baku", "marina", "jeddah"))
-        base_prob = 0.005 if is_street else min(0.08, 0.008 + self.track.corners * 0.003)
+                        for k in ("monaco", "baku", "marina", "jeddah", "madring"))
+        base_prob = 0.002 if is_street else min(0.025, 0.003 + self.track.corners * 0.001)
 
-        aggression_mod = (car.driver.aggression - 0.50) * 0.06
+        aggression_mod = (car.driver.aggression - 0.50) * 0.02
         # Increase while in close battle
-        battle_mod = 0.02 if (car.gap_to_next is not None and car.gap_to_next < 1.5) else 0.0
+        battle_mod = 0.008 if (car.gap_to_next is not None and car.gap_to_next < 1.5) else 0.0
 
         return self._rng.random() < (base_prob + aggression_mod + battle_mod)
 
