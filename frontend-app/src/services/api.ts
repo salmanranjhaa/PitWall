@@ -145,6 +145,9 @@ export const getRaceState = (sessionId: string) =>
 export const setErsMode = (sessionId: string, mode: string) =>
   post<{ state: RaceState }>("/race/ers", { session_id: sessionId, mode });
 
+export const setDriveMode = (sessionId: string, mode: string) =>
+  post<{ state: RaceState }>("/race/drive-mode", { session_id: sessionId, mode });
+
 // ---------------------------------------------------------------------------
 // Auto-run SSE stream
 // ---------------------------------------------------------------------------
@@ -380,6 +383,13 @@ export interface RaceState {
   finished: boolean;
   bdi_states?: Record<number, BDIState>;
   engineer_recommendation?: EngineerRecommendation;
+  race_control?: {
+    flag?: string;
+    safety_car_laps_remaining?: number;
+    vsc_laps_remaining?: number;
+    red_flag_laps_remaining?: number;
+    player_drive_mode?: string;
+  };
 }
 
 export interface StrategyMsg {

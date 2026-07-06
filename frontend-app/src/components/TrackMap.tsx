@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { getTrackPath } from "@/data/trackPaths";
 import type { CarStateApi } from "@/services/api";
 
@@ -25,20 +25,6 @@ const TIRE_COLORS: Record<string, string> = {
 };
 
 const SECTOR_COLORS = ["#FF3333", "#A78BFA", "#22D3EE"];
-
-// Backend sends track_fraction as an absolute monotonically-increasing value:
-//   fraction = current_lap - (gap_to_leader / ref_lap_time)
-// so each lap tick the value increases by ~1.0 and the frontend lerps a full lap forward.
-// Display uses (fraction % 1.0) to get 0–1 circuit position.
-// diff > 1.5 = more than one full lap jump (SC compression, rejoin) → snap.
-// diff < 0 = car fell back on track (pit stop during the tick) → still animate forward
-//             to the pit-exit position which is ~(1 + diff) laps forward.
-function lerpFractionForward(from: number, to: number, t: number): number {
-  let diff = to - from;
-  if (diff < -1.5 || diff > 2.5) return to; // extreme discontinuity — snap
-  if (diff < 0) diff += 1;                   // pit-stop setback: animate to ~pit-exit position
-  return from + diff * t;
-}
 
 function getTLA(name: string | undefined): string {
   if (!name) return "???";
@@ -147,117 +133,44 @@ function SFLine({ points }: { points: [number, number][] }) {
   );
 }
 
-// ── animated car dot ─────────────────────────────────────────────────────────
+// ── car dot (static shape — position applied imperatively via transform) ─────
+//
+// All child coordinates are relative to (0,0); the parent <g> gets its
+// translate(x y) set directly by the single RAF loop in TrackMap. This keeps
+// React out of the per-frame path entirely — no setState, no re-render.
 
 interface CarDotProps {
-  points: [number, number][];
-  dists: number[];
-  targetFraction: number;
   color: string;
   tireColor: string;
   tla: string;
   isPlayer: boolean;
   isPitting: boolean;
   pits: number;
-  animDurationMs: number;
   isLeader?: boolean;
   lapsDown?: number;
-  onLapCross?: () => void;
+  gRef: (el: SVGGElement | null) => void;
 }
 
-function CarDot({ points, dists, targetFraction, color, tireColor, tla, isPlayer, isPitting, pits, animDurationMs, isLeader = false, lapsDown = 0, onLapCross }: CarDotProps) {
-  // Absolute (non-wrapping) position — increases monotonically.
-  // display fraction = absRef.current % 1.0
-  const absRef    = useRef(targetFraction);
-  const targetRef = useRef(targetFraction);
-  const lastRef   = useRef<number | null>(null);
-  const rafRef    = useRef<number | null>(null);
-  const onLapCrossRef = useRef(onLapCross);
-  const [xy, setXY] = useState<[number, number]>(() => interpolate(points, dists, targetFraction % 1.0));
-
-  // Keep targetRef in sync silently — the RAF loop reads it via ref.
-  // Only hard-snap absRef on extreme anomalies (>2.5 laps ahead or going backwards).
-  useEffect(() => {
-    const diff = targetFraction - targetRef.current;
-    if (diff < -0.5 || diff > 2.5) {
-      absRef.current = targetFraction; // teleport: SC restart, reconnect, pit teleport
-    }
-    targetRef.current = targetFraction;
-  }, [targetFraction]);
-
-  // Keep lap-cross callback in sync without restarting the RAF loop.
-  useEffect(() => { onLapCrossRef.current = onLapCross; }, [onLapCross]);
-
-  // Perpetual RAF loop — car is always moving, never stationary between laps.
-  // animDurationMs = real milliseconds for one full circuit at the current sim speed.
-  // Backend states are soft checkpoints; gentle correction keeps sync.
-  useEffect(() => {
-    if (animDurationMs === 0) {
-      // Paused — snap to target and stop
-      absRef.current = targetRef.current;
-      setXY(interpolate(points, dists, ((targetRef.current % 1.0) + 1.0) % 1.0));
-      return;
-    }
-
-    const rate = 1.0 / animDurationMs; // fractions per ms — 1 full circuit per interval
-
-    const tick = (now: number) => {
-      const dt = lastRef.current !== null ? Math.min(now - lastRef.current, 100) : 0;
-      lastRef.current = now;
-
-      // Detect S/F crossing BEFORE advancing (fire when floor increments)
-      const prevFloor = Math.floor(absRef.current);
-
-      // Constant-speed advance — car is always exactly animDurationMs behind the live target.
-      // Being ~1.0 behind targetRef is NORMAL (we are animating the current lap).
-      absRef.current += dt * rate;
-
-      const newFloor = Math.floor(absRef.current);
-      if (newFloor > prevFloor && onLapCrossRef.current) {
-        onLapCrossRef.current();
-      }
-
-      // Only two special cases:
-      const ahead = absRef.current - targetRef.current;
-      if (Math.abs(ahead) > 1.5) {
-        // >1.5 laps off (speed change, SC compression, reconnect) — hard snap
-        absRef.current = targetRef.current;
-      } else if (ahead > 0.5) {
-        // Car has gone noticeably past the checkpoint (e.g., under SC cars slow,
-        // animation ran past them) — gently shed the excess over ~10 seconds
-        absRef.current -= ahead * 0.005;
-      }
-
-      setXY(interpolate(points, dists, ((absRef.current % 1.0) + 1.0) % 1.0));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    lastRef.current = null;
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
-  }, [animDurationMs, points, dists]); // targetFraction + onLapCross handled via refs
-
-  const [cx, cy] = xy;
-
+function CarDot({ color, tireColor, tla, isPlayer, isPitting, pits, isLeader = false, lapsDown = 0, gRef }: CarDotProps) {
   return (
-    <g style={{ cursor: "default" }} opacity={lapsDown > 0 ? 0.55 : 1}>
+    <g ref={gRef} style={{ cursor: "default" }} opacity={lapsDown > 0 ? 0.55 : 1}>
       {/* Pulsing glow for player */}
       {isPlayer && (
         <>
-          <circle cx={cx} cy={cy} r={7} fill={color} opacity={0.08} />
-          <circle cx={cx} cy={cy} r={4.5} fill="none" stroke="#FFD300" strokeWidth={1.3} opacity={0.9} />
+          <circle cx={0} cy={0} r={7} fill={color} opacity={0.08} />
+          <circle cx={0} cy={0} r={4.5} fill="none" stroke="#FFD300" strokeWidth={1.3} opacity={0.9} />
         </>
       )}
 
       {/* Pit indicator ring */}
       {isPitting && (
-        <circle cx={cx} cy={cy} r={5.5} fill="none" stroke="#7B61FF"
+        <circle cx={0} cy={0} r={5.5} fill="none" stroke="#7B61FF"
           strokeWidth={1} strokeDasharray="2 2" opacity={0.8} />
       )}
 
       {/* Main dot */}
       <circle
-        cx={cx} cy={cy}
+        cx={0} cy={0}
         r={isPlayer ? 3.2 : 2.4}
         fill={color}
         stroke={isPlayer ? "#FFD300" : "#16161E"}
@@ -266,16 +179,16 @@ function CarDot({ points, dists, targetFraction, color, tireColor, tla, isPlayer
       />
 
       {/* Tire indicator */}
-      <circle cx={cx + 2.8} cy={cy - 2.8} r={1.2} fill={tireColor} opacity={0.9} />
+      <circle cx={2.8} cy={-2.8} r={1.2} fill={tireColor} opacity={0.9} />
 
       {/* Leader crown */}
       {isLeader && (
-        <text x={cx} y={cy - 10.5} textAnchor="middle" fontSize={4.5} fill="#FFD300" opacity={0.95}>♛</text>
+        <text x={0} y={-10.5} textAnchor="middle" fontSize={4.5} fill="#FFD300" opacity={0.95}>♛</text>
       )}
 
       {/* TLA label */}
       <text
-        x={cx} y={cy - 6}
+        x={0} y={-6}
         textAnchor="middle"
         fontSize={isPlayer ? 3.8 : 3.0}
         fontFamily="'Courier New', monospace"
@@ -288,7 +201,7 @@ function CarDot({ points, dists, targetFraction, color, tireColor, tla, isPlayer
 
       {/* Lapped car badge */}
       {lapsDown > 0 && (
-        <text x={cx} y={cy + 7.5} textAnchor="middle" fontSize={2.5}
+        <text x={0} y={7.5} textAnchor="middle" fontSize={2.5}
           fontFamily="monospace" fill="#FF6B6B" opacity={0.9}>
           L{lapsDown}
         </text>
@@ -297,7 +210,7 @@ function CarDot({ points, dists, targetFraction, color, tireColor, tla, isPlayer
       {/* Pit count badge */}
       {pits > 0 && (
         <text
-          x={cx + 3.5} y={cy + 5.5}
+          x={3.5} y={5.5}
           textAnchor="middle"
           fontSize={2.5}
           fontFamily="monospace"
@@ -322,6 +235,13 @@ interface TrackMapProps {
   onLeaderLapCross?: () => void;
 }
 
+// Per-car animation state, keyed by driver key. `abs` is the animated absolute
+// fraction (monotonic, laps counted); `target` is the latest backend checkpoint.
+interface CarAnimState {
+  abs: number;
+  target: number;
+}
+
 export default function TrackMap({ trackKey, cars, playerTeam, className = "", animDurationMs = 800, onLeaderLapCross }: TrackMapProps) {
   const { points, s1End, s2End } = getTrackPath(trackKey);
 
@@ -343,7 +263,6 @@ export default function TrackMap({ trackKey, cars, playerTeam, className = "", a
   const sortedCars = [...activeCars].sort((a, b) => a.position - b.position);
 
   // Absolute fraction of the leader — used to compute laps-down for each car.
-  // Using the raw gap formula: lapsDown = floor(leaderFraction - carFraction)
   const leaderFraction = sortedCars[0]
     ? ((sortedCars[0] as { track_fraction?: number }).track_fraction ?? 0)
     : 0;
@@ -355,6 +274,88 @@ export default function TrackMap({ trackKey, cars, playerTeam, className = "", a
 
   // Track the previous pit count per driver to detect a pit happening
   const prevPitsRef = useRef<Record<string, number>>({});
+
+  // ── single imperative animation loop ───────────────────────────────────────
+  // One RAF for all cars. Per frame we advance each car's absolute fraction and
+  // write translate(x y) straight onto its <g> element — React never re-renders.
+  const animRef      = useRef<Map<string, CarAnimState>>(new Map());
+  const elsRef       = useRef<Map<string, SVGGElement>>(new Map());
+  const leaderKeyRef = useRef<string | null>(null);
+  const onLapCrossRef = useRef(onLeaderLapCross);
+  useEffect(() => { onLapCrossRef.current = onLeaderLapCross; }, [onLeaderLapCross]);
+
+  // Sync backend checkpoints into the animation state on every render.
+  // Only hard-snap on extreme anomalies (reconnect, SC teleport); a target
+  // ~1.0 lap ahead of abs is NORMAL — we animate the current lap toward it.
+  sortedCars.forEach((car) => {
+    const fraction  = (car as { track_fraction?: number }).track_fraction ?? 0;
+    const driverObj = typeof car.driver === "object" ? car.driver as { name: string; team: string } : null;
+    const key       = getTLA(driverObj?.name ?? (typeof car.driver === "string" ? car.driver : "")) + "-" + (driverObj?.team ?? "");
+    const st = animRef.current.get(key);
+    if (!st) {
+      animRef.current.set(key, { abs: fraction, target: fraction });
+    } else {
+      const diff = fraction - st.target;
+      if (diff < -0.5 || diff > 2.5) st.abs = fraction; // teleport: SC restart, reconnect
+      st.target = fraction;
+    }
+    if (car.position === 1) leaderKeyRef.current = key;
+  });
+
+  useEffect(() => {
+    const applyTransform = (key: string, st: CarAnimState) => {
+      const el = elsRef.current.get(key);
+      if (!el) return;
+      const [x, y] = interpolate(points, dists, ((st.abs % 1.0) + 1.0) % 1.0);
+      el.setAttribute("transform", `translate(${x} ${y})`);
+    };
+
+    if (animDurationMs === 0) {
+      // Paused / finished — snap everything to its checkpoint and stop.
+      animRef.current.forEach((st, key) => {
+        st.abs = st.target;
+        applyTransform(key, st);
+      });
+      return;
+    }
+
+    const rate = 1.0 / animDurationMs; // fractions per ms — 1 full circuit per interval
+    let last: number | null = null;
+    let raf = 0;
+
+    const tick = (now: number) => {
+      const dt = last !== null ? Math.min(now - last, 100) : 0;
+      last = now;
+
+      animRef.current.forEach((st, key) => {
+        const prevFloor = Math.floor(st.abs);
+
+        // Constant-speed advance — car trails the live checkpoint by ~1 lap.
+        st.abs += dt * rate;
+
+        // Leader S/F crossing drives the visible lap counter.
+        if (key === leaderKeyRef.current && Math.floor(st.abs) > prevFloor) {
+          onLapCrossRef.current?.();
+        }
+
+        const ahead = st.abs - st.target;
+        if (Math.abs(ahead) > 1.5) {
+          // >1.5 laps off (speed change, SC compression, reconnect) — hard snap
+          st.abs = st.target;
+        } else if (ahead > 0.5) {
+          // Ran noticeably past the checkpoint (SC slowdown) — shed excess gently
+          st.abs -= ahead * 0.005;
+        }
+
+        applyTransform(key, st);
+      });
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [animDurationMs, points, dists]);
 
   return (
     <div className={`relative bg-carbon rounded-lg overflow-hidden ${className}`}>
@@ -391,7 +392,7 @@ export default function TrackMap({ trackKey, cars, playerTeam, className = "", a
         {/* Start/Finish */}
         <SFLine points={points} />
 
-        {/* Animated car dots — render back-to-front so P1 on top */}
+        {/* Car dots — render back-to-front so P1 on top */}
         {[...sortedCars].reverse().map((car) => {
           const fraction  = (car as { track_fraction?: number }).track_fraction ?? 0;
           const driverObj = typeof car.driver === "object" ? car.driver as { name: string; team: string; number: number } : null;
@@ -415,19 +416,28 @@ export default function TrackMap({ trackKey, cars, playerTeam, className = "", a
           return (
             <CarDot
               key={key}
-              points={points}
-              dists={dists}
-              targetFraction={fraction}
               color={color}
               tireColor={tireColor}
               tla={tla}
               isPlayer={isPlayer}
               isPitting={isPitting}
               pits={pits}
-              animDurationMs={animDurationMs}
               isLeader={isLeader}
               lapsDown={lapsDown}
-              onLapCross={isLeader ? onLeaderLapCross : undefined}
+              gRef={(el) => {
+                if (el) {
+                  elsRef.current.set(key, el);
+                  // Position immediately on mount so the dot never flashes at origin
+                  const st = animRef.current.get(key);
+                  if (st) {
+                    const [x, y] = interpolate(points, dists, ((st.abs % 1.0) + 1.0) % 1.0);
+                    el.setAttribute("transform", `translate(${x} ${y})`);
+                  }
+                } else {
+                  elsRef.current.delete(key);
+                  animRef.current.delete(key);
+                }
+              }}
             />
           );
         })}

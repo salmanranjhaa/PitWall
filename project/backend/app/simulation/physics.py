@@ -102,10 +102,14 @@ class ERSMode:
     description: str
 
 
+# 2026 power units: ~50/50 combustion/electric split makes energy management
+# central. CHARGE deliberately lifts-and-coasts to harvest; running the
+# battery flat causes "clipping" (derate) on the straights.
 ERS_MODES: Dict[str, ERSMode] = {
-    "NONE": ERSMode("NONE", 0.0, 0.0, "No ERS deployment"),
+    "CHARGE": ERSMode("CHARGE", -0.30, -20.0, "Harvest mode — slower lap, big battery recharge"),
+    "NONE": ERSMode("NONE", 0.0, 0.0, "No extra deployment"),
     "BALANCED": ERSMode("BALANCED", 0.15, 8.0, "Balanced energy usage"),
-    "ATTACK": ERSMode("ATTACK", 0.35, 18.0, "Maximum attack mode"),
+    "ATTACK": ERSMode("ATTACK", 0.35, 18.0, "Maximum deployment"),
     "DEFEND": ERSMode("DEFEND", 0.25, 14.0, "Defensive deployment"),
 }
 
@@ -126,8 +130,9 @@ class CarPhysics:
     # Fuel effect: each kg of fuel costs approximately 0.03 seconds per lap.
     FUEL_EFFECT_PER_KG: float = 0.03
 
-    # DRS advantage: opening the DRS saves approximately 0.35 seconds per lap.
-    DRS_LAP_ADVANTAGE: float = 0.35
+    # 2026 Manual Override Mode (replaces DRS): extra electrical deployment
+    # when within 1s of the car ahead — worth ~0.45s but costs battery.
+    DRS_LAP_ADVANTAGE: float = 0.45
 
     # Track evolution: lap times improve by ~0.006s per lap as track rubbers in.
     TRACK_EVOLUTION_PER_LAP: float = 0.006

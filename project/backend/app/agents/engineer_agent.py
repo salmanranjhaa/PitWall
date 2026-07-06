@@ -176,17 +176,45 @@ class RaceEngineerAgent:
             )
 
         if top.goal == GoalType.MANAGE_TIRES or top.goal == GoalType.EXTEND_STINT:
+            window = self._projected_pit_window()
             return EngineerRecommendation(
                 priority="INFO", action="MANAGE", compound=None,
                 headline="Manage tires — extend stint",
-                rationale=top.reason,
-                confidence=0.70, pit_window=None,
+                rationale=self._window_rationale(top.reason, window),
+                confidence=0.70, pit_window=window,
             )
 
-        # Default info recommendation
+        # Default info recommendation — always project the next pit window
+        window = self._projected_pit_window()
         return EngineerRecommendation(
             priority="INFO", action="MONITOR", compound=None,
             headline=f"Monitor — {top.goal.name.replace('_', ' ').lower()}",
-            rationale=top.reason,
-            confidence=0.70, pit_window=None,
+            rationale=self._window_rationale(top.reason, window),
+            confidence=0.70, pit_window=window,
         )
+
+    def _projected_pit_window(self) -> Optional[Tuple[int, int]]:
+        """
+        Project the optimal pit window from remaining predicted tire life.
+
+        Opens ~3 laps before the cliff, closes at the cliff plus a small
+        nursing margin — clamped to the remaining race distance.
+        """
+        b = self.beliefs
+        life = b.self_belief.tire.predicted_life
+        lap = b.race_context.current_lap
+        last_lap = b.race_context.total_laps
+        if life <= 0 or b.race_context.laps_remaining <= 3:
+            return None
+        start = min(last_lap - 1, lap + max(1, life - 3))
+        end = min(last_lap - 1, lap + life + 2)
+        if start >= end:
+            return None
+        return (start, end)
+
+    @staticmethod
+    def _window_rationale(reason: str, window: Optional[Tuple[int, int]]) -> str:
+        if window is None:
+            return reason
+        base = reason.rstrip(".") if reason else "Running to plan"
+        return f"{base}. Projected pit window: lap {window[0]}–{window[1]}."

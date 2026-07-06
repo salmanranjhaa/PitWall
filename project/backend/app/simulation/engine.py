@@ -248,8 +248,9 @@ class RaceEngine:
     and strategy message generation.
     """
 
-    # ERS battery recharge per lap under normal conditions
-    ERS_RECHARGE_PER_LAP: float = 12.0
+    # ERS battery recharge per lap under normal conditions (2026: harvesting
+    # alone cannot fund permanent full deployment — CHARGE mode exists for that)
+    ERS_RECHARGE_PER_LAP: float = 10.0
     # Maximum ERS battery capacity
     ERS_MAX_BATTERY: float = 100.0
     # DRS activation gap threshold (seconds within car ahead)
@@ -309,6 +310,12 @@ class RaceEngine:
         self._overtake_cooldown: Dict[Tuple[int, int], int] = {}
         self._sector_flag_ttl: Dict[int, int] = {}
         self._last_ai_pit_lap: Dict[int, int] = {}
+        # Player race-engineer commands (persist until changed)
+        self._player_drive_mode: str = "NEUTRAL"   # PUSH | NEUTRAL | CONSERVE
+        # Team-radio state for the player's driver
+        self._last_radio_lap: int = -5
+        self._radio_flags: Dict[str, Any] = {"was_raining": False, "best_lap": None,
+                                             "prev_position": None, "tire_warned": False}
 
     # -------------------------------------------------------------------------
     # RACE LIFECYCLE
@@ -558,6 +565,15 @@ class RaceEngine:
             car._tire_wear_multiplier = 1.0  # type: ignore[attr-defined]
             car._defending = False      # type: ignore[attr-defined]
 
+        # Player drive mode (race-engineer command) — persists until changed
+        if self._player_car is not None and self._player_car.alive:
+            if self._player_drive_mode == "PUSH":
+                self._player_car._pace_multiplier = 0.990       # type: ignore[attr-defined]
+                self._player_car._tire_wear_multiplier = 1.28   # type: ignore[attr-defined]
+            elif self._player_drive_mode == "CONSERVE":
+                self._player_car._pace_multiplier = 1.012       # type: ignore[attr-defined]
+                self._player_car._tire_wear_multiplier = 0.70   # type: ignore[attr-defined]
+
         # 3. Run BDI agent cycle before lap-time calculation so pace, pit, and
         # defensive actions affect this lap.
         self._update_gaps()
@@ -633,6 +649,9 @@ class RaceEngine:
 
         # 12. Generate strategy messages
         self._generate_messages()
+
+        # 12b. Player driver team radio
+        self._generate_player_radio()
 
         # 13. Check race finish
         if self._current_lap >= self.track.laps:
@@ -736,7 +755,7 @@ class RaceEngine:
             Updated RaceState.
         """
         if self._player_car:
-            valid_modes = ["NONE", "BALANCED", "ATTACK", "DEFEND"]
+            valid_modes = ["CHARGE", "NONE", "BALANCED", "ATTACK", "DEFEND"]
             if mode in valid_modes:
                 self._player_car.ers_mode = mode
                 self._state.messages.append(StrategyMessage(
@@ -746,6 +765,40 @@ class RaceEngine:
                     trigger_lap=self._current_lap,
                 ))
         return self._state
+
+    def set_drive_mode(self, mode: str) -> RaceState:
+        """
+        Set the player's drive mode — the race-engineer pace command.
+
+        PUSH: ~0.9s/lap faster, +28% tire wear.
+        NEUTRAL: baseline.
+        CONSERVE: ~1.1s/lap slower, -30% tire wear (extends the stint).
+        """
+        valid = ("PUSH", "NEUTRAL", "CONSERVE")
+        if self._player_car is None or mode not in valid:
+            return self._state
+        if mode == self._player_drive_mode:
+            return self._state
+        self._player_drive_mode = mode
+
+        ack = {
+            "PUSH": "Copy, push mode. I'm going after them.",
+            "NEUTRAL": "Understood, back to normal running.",
+            "CONSERVE": "Okay, lifting and coasting. Saving the tires.",
+        }[mode]
+        self._state.messages.append(StrategyMessage(
+            msg_type="RADIO", text=ack, confidence=1.0, trigger_lap=self._current_lap,
+        ))
+        self._state.messages.append(StrategyMessage(
+            msg_type="INFO", text=f"Drive mode set to {mode}",
+            confidence=1.0, trigger_lap=self._current_lap,
+        ))
+        self._state.race_control = self._race_control_payload()
+        return self._state
+
+    @property
+    def player_drive_mode(self) -> str:
+        return self._player_drive_mode
 
     def get_state(self) -> RaceState:
         """
@@ -815,7 +868,7 @@ class RaceEngine:
                 "track_temp": float(f.track_temp),
                 "humidity": float(f.humidity),
                 "rain_intensity": float(f.rain_intensity),
-                "rain_probability": float(f.rain_intensity),
+                "rain_probability": float(getattr(f, "rain_chance", 0.0) or f.rain_intensity),
                 "track_dampness": float(f.track_dampness),
                 "wind_speed": float(f.wind_speed),
                 "is_raining": bool(f.rain_intensity > 0.05),
@@ -850,6 +903,7 @@ class RaceEngine:
             "safety_car_laps_remaining": self._sc_controller.sc_laps_remaining,
             "vsc_laps_remaining": self._sc_controller.vsc_laps_remaining,
             "red_flag_laps_remaining": self._sc_controller.red_laps_remaining,
+            "player_drive_mode": self._player_drive_mode,
         }
 
     # -------------------------------------------------------------------------
@@ -880,8 +934,12 @@ class RaceEngine:
             if physics is None:
                 continue
 
-            # Determine if DRS is used
-            drs_used = car.drs_available and self._state.flag == FlagState.GREEN
+            # 2026 Manual Override Mode (ex-DRS): extra deployment when in
+            # range — needs battery, and using it costs charge.
+            drs_used = (car.drs_available and self._state.flag == FlagState.GREEN
+                        and car.ers_battery >= 15.0)
+            if drs_used:
+                car.ers_battery = max(0.0, car.ers_battery - 6.0)
 
             # Get traffic gap to car ahead
             traffic_gap = car.gap_to_next
@@ -914,6 +972,10 @@ class RaceEngine:
                 lap_time *= 1.25  # ~25% slower under SC
             elif self._state.flag == FlagState.VSC:
                 lap_time *= 1.12  # ~12% slower under VSC
+
+            # Battery clipping: a flat battery derates the car on the straights
+            if car.ers_battery < 8.0 and car.ers_mode in ("BALANCED", "ATTACK", "DEFEND"):
+                lap_time += 0.35
 
             # Apply agent pace multiplier
             if hasattr(car, '_pace_multiplier') and car._pace_multiplier != 1.0:
@@ -1467,16 +1529,22 @@ class RaceEngine:
             fuel_consumed = self.track.fuel_per_lap + self._rng.gauss(0, 0.02)
             car.fuel = max(0.0, car.fuel - fuel_consumed)
 
-            # ERS management
-            ers_costs = {"NONE": 0.0, "BALANCED": 8.0, "ATTACK": 18.0, "DEFEND": 14.0}
+            # ERS management — 2026 rules make deployment a real budget:
+            # passive recharge alone cannot sustain BALANCED forever.
+            ers_costs = {"CHARGE": -20.0, "NONE": 0.0, "BALANCED": 8.0,
+                         "ATTACK": 18.0, "DEFEND": 14.0}
             ers_drain = ers_costs.get(car.ers_mode, 8.0)
             car.ers_battery = max(0.0, car.ers_battery - ers_drain)
             car.ers_battery = min(self.ERS_MAX_BATTERY,
                                    car.ers_battery + self.ERS_RECHARGE_PER_LAP)
 
-            # Auto-switch ERS if battery depleted
+            # Depleted battery: drop to harvest mode until charge recovers
             if car.ers_battery < 5.0:
-                car.ers_mode = "NONE"
+                car.ers_mode = "CHARGE"
+            elif car.ers_mode == "CHARGE" and car.ers_battery > 70.0 and \
+                    car is not self._player_car:
+                # AI returns to balanced deployment once recharged
+                car.ers_mode = "BALANCED"
 
     def _generate_messages(self) -> None:
         """
@@ -1611,6 +1679,120 @@ class RaceEngine:
 
         # Keep only the most recent 10 messages and add new ones
         self._state.messages = self._state.messages[-5:] + messages
+
+    # ------------------------------------------------------------------
+    # Team radio — the player's driver talks back
+    # ------------------------------------------------------------------
+
+    def _generate_player_radio(self) -> None:
+        """
+        Emit team-radio messages from the player's driver.
+
+        Messages are driven by the same signals the BDI agents perceive
+        (tire state, gaps, battery, weather, incidents) plus the driver's
+        aggression, with a cooldown so the driver doesn't chatter every lap.
+        Urgent calls (dead tires, rain) bypass the cooldown.
+        """
+        car = self._player_car
+        if car is None or not car.alive or car.finished:
+            return
+
+        flags = self._radio_flags
+        lap = self._current_lap
+        rng = self._rng
+        agg = car.driver.aggression
+        on_cooldown = (lap - self._last_radio_lap) < 3
+
+        def say(text: str, urgent: bool = False) -> bool:
+            if on_cooldown and not urgent:
+                return False
+            self._state.messages.append(StrategyMessage(
+                msg_type="RADIO", text=text, confidence=1.0, trigger_lap=lap,
+            ))
+            self._last_radio_lap = lap
+            return True
+
+        weather = self._state.weather
+        is_raining = bool(weather and weather.rain_intensity > 0.05)
+
+        # 1. Rain starting / stopping (urgent)
+        if is_raining and not flags["was_raining"]:
+            say(rng.choice([
+                "It's raining! Spots on the visor — talk to me about inters.",
+                "Rain's here. Rears are sliding everywhere, what's the plan?",
+            ]), urgent=True)
+        elif not is_raining and flags["was_raining"] and \
+                car.tire.compound in ("INTERMEDIATE", "WET"):
+            say(rng.choice([
+                "Line's drying out. These inters won't last, think about slicks.",
+                "It's dry enough for slicks soon — your call.",
+            ]), urgent=True)
+        flags["was_raining"] = is_raining
+
+        # 2. Tire state (urgent when dead, once per stint)
+        if car.tire.wear > 0.88 and not flags["tire_warned"]:
+            flags["tire_warned"] = True
+            say(rng.choice([
+                "These tires are DEAD. Box box box!",
+                "I've got nothing left in these tires, we have to stop.",
+            ]), urgent=True)
+        elif car.tire.wear < 0.20:
+            flags["tire_warned"] = False
+        elif 0.60 < car.tire.wear <= 0.75 and not on_cooldown and rng.random() < 0.4:
+            say(rng.choice([
+                "Rears are starting to drop off. A few more laps in these, max.",
+                "Fronts are graining — losing time in the slow stuff.",
+            ]))
+
+        # 3. Battery / deployment
+        if car.ers_battery < 10.0 and rng.random() < 0.5:
+            say(rng.choice([
+                "No deployment left — I'm clipping everywhere down the straights.",
+                "Battery's flat. I need a couple of laps to harvest.",
+            ]))
+
+        # 4. Battles
+        if car.gap_to_next is not None and car.gap_to_next < 1.0 and rng.random() < 0.45:
+            if agg > 0.75:
+                say(rng.choice([
+                    "I'm much faster than him — give me override, I'm going for it.",
+                    "He's holding me up. I'm sending it next lap.",
+                ]))
+            else:
+                say(rng.choice([
+                    "In his dirty air — managing the tires, waiting for a mistake.",
+                    "I can follow him. Let's think about the undercut.",
+                ]))
+        prev_pos = flags["prev_position"]
+        if prev_pos is not None and car.position < prev_pos:
+            say(rng.choice([
+                "Got him! Who's next?",
+                "That's one. Keep the updates coming.",
+            ]), urgent=True)
+        elif prev_pos is not None and car.position > prev_pos and not is_raining:
+            say(rng.choice([
+                "He got me on the straight — nothing I could do without battery.",
+                "Lost one there. I'll get it back, don't worry.",
+            ]))
+        flags["prev_position"] = car.position
+
+        # 5. Personal best lap feedback
+        if car.lap_time > 30:
+            best = flags["best_lap"]
+            if best is None or car.lap_time < best:
+                if best is not None and lap > 3 and rng.random() < 0.5:
+                    say(rng.choice([
+                        "That felt good. Car's coming alive now.",
+                        "Purple sectors — the balance is finally there.",
+                    ]))
+                flags["best_lap"] = car.lap_time
+
+        # 6. Leading quietly
+        if car.position == 1 and lap % 10 == 0:
+            say(rng.choice([
+                "Clean air up here. Just tell me what the gap is.",
+                "Car feels good in the lead — keep me honest on the pit window.",
+            ]))
 
     def _finish_race(self) -> None:
         """

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- PitWall pit-board favicon -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#16161E" stroke="#2D2D3D" stroke-width="2"/>
+  <!-- checkered top strip -->
+  <g>
+    <rect x="8" y="8" width="8" height="8" fill="#F5F5F5"/>
+    <rect x="16" y="8" width="8" height="8" fill="#16161E"/>
+    <rect x="24" y="8" width="8" height="8" fill="#F5F5F5"/>
+    <rect x="32" y="8" width="8" height="8" fill="#16161E"/>
+    <rect x="40" y="8" width="8" height="8" fill="#F5F5F5"/>
+    <rect x="48" y="8" width="8" height="8" fill="#16161E"/>
+  </g>
+  <!-- P monogram -->
+  <text x="32" y="50" text-anchor="middle" font-family="'Courier New', monospace" font-weight="900" font-size="34" fill="#FF1E00">P</text>
+  <!-- gold underline (pit wall) -->
+  <rect x="12" y="53" width="40" height="3" rx="1.5" fill="#FFD300"/>
+</svg>

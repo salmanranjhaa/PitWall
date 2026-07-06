@@ -6,6 +6,7 @@ import {
   AlertTriangle, AlertCircle, CheckCircle, Timer, Flag,
   ChevronDown, ChevronUp, BrainCircuit, Navigation,
   Pause, Play, User2, Radio, X, Headphones, Trophy, BarChart2,
+  Zap, BatteryCharging, Gauge,
 } from "lucide-react";
 import {
   AreaChart, Area, LineChart, Line,
@@ -14,6 +15,7 @@ import {
 } from "recharts";
 import {
   streamAutoRace, playerPit,
+  setDriveMode as apiSetDriveMode, setErsMode as apiSetErsMode,
   type RaceState, type CarStateApi, type RaceEventEntry, type StrategyMsg,
   type BDIState, type EngineerRecommendation,
 } from "@/services/api";
@@ -44,6 +46,7 @@ const msgCfg: Record<string, { color: string; bg: string; border: string; Icon: 
   WARNING:     { color: "#FFB800", bg: "bg-amber-500/10", border: "border-amber-500/30", Icon: AlertTriangle },
   OPPORTUNITY: { color: "#00F5A0", bg: "bg-green-500/10", border: "border-green-500/30", Icon: TrendingUp   },
   URGENT:      { color: "#FF2D2D", bg: "bg-red-500/10",   border: "border-red-500/30",   Icon: AlertCircle  },
+  RADIO:       { color: "#C4B5FD", bg: "bg-violet-500/10", border: "border-violet-500/30", Icon: Radio       },
 };
 
 const eventCfg: Record<string, { color: string; symbol: string }> = {
@@ -748,6 +751,38 @@ export default function Dashboard() {
     }
   };
 
+  // Race-engineer commands — pace + energy management (2026 regs)
+  const driveMode = raceState?.race_control?.player_drive_mode ?? "NEUTRAL";
+  const ersMode   = player?.ers_mode ?? "BALANCED";
+  const battery   = player?.ers_battery ?? 100;
+  const [cmdBusy, setCmdBusy] = useState(false);
+
+  const handleDriveMode = async (mode: string) => {
+    if (sessionId === "mock" || cmdBusy || phase !== "RACING") return;
+    setCmdBusy(true);
+    try {
+      const result = await apiSetDriveMode(sessionId, mode);
+      if (result.state) setRaceState(result.state);
+    } catch (err) {
+      console.error("Drive mode failed:", err);
+    } finally {
+      setCmdBusy(false);
+    }
+  };
+
+  const handleErsMode = async (mode: string) => {
+    if (sessionId === "mock" || cmdBusy || phase !== "RACING") return;
+    setCmdBusy(true);
+    try {
+      const result = await apiSetErsMode(sessionId, mode);
+      if (result.state) setRaceState(result.state);
+    } catch (err) {
+      console.error("ERS mode failed:", err);
+    } finally {
+      setCmdBusy(false);
+    }
+  };
+
   const weather       = raceState?.weather;
   const leaderboard   = raceState?.leaderboard ?? [];
   const stratMsgs     = (raceState?.strategy_messages ?? raceState?.messages ?? []) as (StrategyMsg | string)[];
@@ -1081,6 +1116,14 @@ export default function Dashboard() {
                   <span className="text-text-secondary">Fuel</span>
                   <span className="text-text-primary font-mono font-semibold">{player?.fuel?.toFixed(1) ?? "--"} kg</span>
                 </div>
+                {engineerRec?.pit_window && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-text-secondary">Pit window</span>
+                    <span className="text-ferrari-gold font-mono font-semibold">
+                      L{engineerRec.pit_window[0]}–L{engineerRec.pit_window[1]}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* BDI Debug Panel (dev-only) */}
@@ -1108,6 +1151,85 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Race Engineer Commands — pace + 2026 energy management */}
+            <div className="bg-surface rounded-lg border border-border-subtle p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Headphones className="w-4 h-4 text-neural-purple" />
+                <span className="text-[10px] uppercase tracking-wider text-text-ghost font-semibold">Driver Commands</span>
+              </div>
+
+              {/* Pace command */}
+              <p className="text-[9px] uppercase tracking-wider text-text-ghost mb-1 flex items-center gap-1">
+                <Gauge className="w-2.5 h-2.5" /> Pace
+              </p>
+              <div className="grid grid-cols-3 gap-1.5 mb-3">
+                {([
+                  { mode: "CONSERVE", label: "Conserve", color: "#00D084", hint: "Save tires" },
+                  { mode: "NEUTRAL",  label: "Neutral",  color: "#8B8BA8", hint: "Standard"   },
+                  { mode: "PUSH",     label: "Push",     color: "#FF2D2D", hint: "Attack"     },
+                ] as const).map((m) => (
+                  <button key={m.mode}
+                    onClick={() => handleDriveMode(m.mode)}
+                    disabled={cmdBusy || phase !== "RACING"}
+                    className={`p-1.5 rounded border text-center transition-all disabled:opacity-40 ${
+                      driveMode === m.mode ? "border-2" : "border-border-subtle bg-carbon hover:border-text-ghost/30"
+                    }`}
+                    style={driveMode === m.mode
+                      ? { borderColor: m.color, backgroundColor: `${m.color}15` }
+                      : {}}
+                  >
+                    <p className="text-[10px] font-bold" style={{ color: driveMode === m.mode ? m.color : "#D0D0E0" }}>
+                      {m.label}
+                    </p>
+                    <p className="text-[8px] text-text-ghost">{m.hint}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Energy management (2026 regs) */}
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[9px] uppercase tracking-wider text-text-ghost flex items-center gap-1">
+                  <Zap className="w-2.5 h-2.5" /> Energy · 2026
+                </p>
+                <span className="text-[10px] font-mono font-bold"
+                  style={{ color: battery < 15 ? "#FF2D2D" : battery < 35 ? "#FFAA00" : "#00D084" }}>
+                  {battery.toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-carbon rounded-full overflow-hidden mb-2">
+                <div className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${battery}%`,
+                    backgroundColor: battery < 15 ? "#FF2D2D" : battery < 35 ? "#FFAA00" : "#00D084",
+                  }} />
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  { mode: "CHARGE",   label: "CHG", color: "#00D084", Icon: BatteryCharging },
+                  { mode: "BALANCED", label: "BAL", color: "#00D4FF", Icon: null },
+                  { mode: "ATTACK",   label: "ATK", color: "#FF2D2D", Icon: null },
+                  { mode: "DEFEND",   label: "DEF", color: "#FFD300", Icon: null },
+                ] as const).map((m) => (
+                  <button key={m.mode}
+                    onClick={() => handleErsMode(m.mode)}
+                    disabled={cmdBusy || phase !== "RACING"}
+                    className={`py-1.5 rounded border text-[9px] font-mono font-bold text-center transition-all disabled:opacity-40 ${
+                      ersMode === m.mode ? "border-2" : "border-border-subtle bg-carbon hover:border-text-ghost/30"
+                    }`}
+                    style={ersMode === m.mode
+                      ? { borderColor: m.color, backgroundColor: `${m.color}15`, color: m.color }
+                      : { color: "#8B8BA8" }}
+                    title={m.mode}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[8px] text-text-ghost mt-1.5 leading-relaxed">
+                Manual Override needs ≥15% charge · flat battery = clipping (+0.35s/lap)
+              </p>
             </div>
 
             {/* Tire Status */}
@@ -1340,12 +1462,13 @@ export default function Dashboard() {
                           (text.toLowerCase().includes("safety car") || text.toLowerCase().includes("pit immediately"));
                         return !isSCRedundant;
                       })
-                      .slice(-4)
+                      .slice(-6)
                       .map((msg, i) => {
                         const text = typeof msg === "string" ? msg : msg.text ?? "";
                         const type = typeof msg === "object" ? (msg.type ?? "INFO") : "INFO";
                         const cfg  = msgCfg[type] ?? msgCfg.INFO;
                         const Icon = cfg.Icon;
+                        const isRadio = type === "RADIO";
                         return (
                           <motion.div key={i}
                             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
@@ -1354,7 +1477,16 @@ export default function Dashboard() {
                           >
                             <div className="flex items-start gap-2">
                               <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: cfg.color }} />
-                              <p className="text-xs text-text-secondary">{text}</p>
+                              <div className="flex-1 min-w-0">
+                                {isRadio && (
+                                  <p className="text-[8px] font-bold uppercase tracking-widest mb-0.5" style={{ color: cfg.color }}>
+                                    Team Radio
+                                  </p>
+                                )}
+                                <p className={`text-xs ${isRadio ? "italic text-violet-200" : "text-text-secondary"}`}>
+                                  {isRadio ? `“${text}”` : text}
+                                </p>
+                              </div>
                             </div>
                           </motion.div>
                         );

@@ -102,7 +102,13 @@ class PitRequest(BaseModel):
 class ERSRequest(BaseModel):
     """Payload for an ERS mode change."""
     session_id: str = Field(..., description="Active race session ID")
-    mode: str = Field(..., description="ERS mode: CHARGE | BALANCED | ATTACK | DEFEND")
+    mode: str = Field(..., description="ERS mode: CHARGE | NONE | BALANCED | ATTACK | DEFEND")
+
+
+class DriveModeRequest(BaseModel):
+    """Payload for a drive-mode (pace command) change."""
+    session_id: str = Field(..., description="Active race session ID")
+    mode: str = Field(..., description="Drive mode: PUSH | NEUTRAL | CONSERVE")
 
 
 class AdvanceRequest(BaseModel):
@@ -221,6 +227,24 @@ def set_ers_mode(req: ERSRequest):
             return {"error": str(exc)}
 
     return {"message": f"ERS mode set to {req.mode}", "state": engine.get_state()}
+
+
+@router.post("/drive-mode")
+def set_drive_mode(req: DriveModeRequest):
+    """
+    Race-engineer pace command for the player's driver:
+    PUSH (faster, burns tires), NEUTRAL, CONSERVE (slower, saves tires).
+    """
+    engine = _race_engines.get(req.session_id)
+    if not engine:
+        return {"error": "Race session not found"}
+    if hasattr(engine, "set_drive_mode"):
+        try:
+            state = engine.set_drive_mode(req.mode.upper())
+            return {"state": _serialize(state)}
+        except Exception as exc:
+            return {"error": str(exc)}
+    return {"error": "Drive mode not supported"}
 
 
 # ---------------------------------------------------------------------------

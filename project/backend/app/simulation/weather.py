@@ -109,6 +109,9 @@ class WeatherState:
     rain_intensity: float = 0.0
     track_dampness: float = 0.0
     wind_speed: float = 10.0
+    # For forecast entries: fraction of Monte Carlo paths that were raining
+    # at this lap (0-1). 0 for live/current states.
+    rain_chance: float = 0.0
 
     def is_wet(self) -> bool:
         """Return True if track conditions require wet tires."""
@@ -128,6 +131,7 @@ class WeatherState:
             rain_intensity=self.rain_intensity,
             track_dampness=self.track_dampness,
             wind_speed=self.wind_speed,
+            rain_chance=self.rain_chance,
         )
 
 
@@ -358,11 +362,15 @@ class WeatherSystem:
                 path.append(state.copy())
             all_paths.append(path)
 
-        # Aggregate: for each lap ahead, find the most common condition
+        # Aggregate: for each lap ahead, find the most common condition and
+        # the genuine probability of rain (fraction of simulated paths raining)
         forecast: List[WeatherState] = []
         for lap_idx in range(laps):
             conditions = [path[lap_idx].condition for path in all_paths]
             most_common = max(set(conditions), key=conditions.count)
+            rain_chance = sum(
+                1 for path in all_paths if path[lap_idx].rain_intensity > 0.05
+            ) / len(all_paths)
 
             # Average numerical values across all simulations
             # Cast to plain float — np.float64 propagates np.bool_ into API
@@ -382,6 +390,7 @@ class WeatherSystem:
                 rain_intensity=round(avg_rain, 3),
                 track_dampness=round(avg_dampness, 3),
                 wind_speed=round(avg_wind, 1),
+                rain_chance=round(rain_chance, 3),
             ))
 
         if self._lstm_forecaster is not None:
@@ -420,6 +429,7 @@ class WeatherSystem:
                 rain_intensity=round(rain, 3),
                 track_dampness=round(dampness, 3),
                 wind_speed=round((markov.wind_speed * 0.55) + (lstm.wind_speed * 0.45), 1),
+                rain_chance=markov.rain_chance,
             ))
         return blended
 

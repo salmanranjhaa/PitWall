@@ -160,22 +160,22 @@ export const POSITION_HISTORY = Array.from({ length: 44 }, (_, lap) => ({
   Williams: 5 + (Math.random() * 0.2),
 }));
 
-// Illustrative 2026 mid-season standings (after ~12 of 24 rounds)
+// Real 2026 standings after the British Grand Prix
 export const DRIVER_STANDINGS = [
-  { position: 1, driver: "Max Verstappen", team: "Red Bull Racing", points: 216, wins: 6, podiums: 10 },
-  { position: 2, driver: "Lando Norris", team: "McLaren", points: 198, wins: 3, podiums: 9 },
-  { position: 3, driver: "Oscar Piastri", team: "McLaren", points: 173, wins: 2, podiums: 8 },
-  { position: 4, driver: "George Russell", team: "Mercedes", points: 148, wins: 1, podiums: 6 },
-  { position: 5, driver: "Charles Leclerc", team: "Ferrari", points: 132, wins: 0, podiums: 5 },
-  { position: 6, driver: "Lewis Hamilton", team: "Ferrari", points: 118, wins: 0, podiums: 4 },
-  { position: 7, driver: "Fernando Alonso", team: "Aston Martin", points: 96, wins: 0, podiums: 3 },
-  { position: 8, driver: "Kimi Antonelli", team: "Mercedes", points: 74, wins: 0, podiums: 1 },
+  { position: 1, driver: "Kimi Antonelli", team: "Mercedes", points: 179, wins: 4, podiums: 8 },
+  { position: 2, driver: "George Russell", team: "Mercedes", points: 154, wins: 3, podiums: 7 },
+  { position: 3, driver: "Lewis Hamilton", team: "Ferrari", points: 147, wins: 1, podiums: 6 },
+  { position: 4, driver: "Charles Leclerc", team: "Ferrari", points: 108, wins: 1, podiums: 4 },
+  { position: 5, driver: "Lando Norris", team: "McLaren", points: 97, wins: 0, podiums: 3 },
+  { position: 6, driver: "Oscar Piastri", team: "McLaren", points: 82, wins: 0, podiums: 2 },
+  { position: 7, driver: "Max Verstappen", team: "Red Bull Racing", points: 76, wins: 0, podiums: 2 },
+  { position: 8, driver: "Liam Lawson", team: "Racing Bulls", points: 30, wins: 0, podiums: 0 },
 ];
 
 export const CONSTRUCTOR_STANDINGS = [
-  { position: 1, team: "McLaren", points: 371, wins: 5 },
-  { position: 2, team: "Red Bull Racing", points: 262, wins: 6 },
-  { position: 3, team: "Ferrari", points: 250, wins: 0 },
-  { position: 4, team: "Mercedes", points: 222, wins: 1 },
-  { position: 5, team: "Aston Martin", points: 141, wins: 0 },
+  { position: 1, team: "Mercedes", points: 315, wins: 7 },
+  { position: 2, team: "Ferrari", points: 215, wins: 2 },
+  { position: 3, team: "McLaren", points: 179, wins: 0 },
+  { position: 4, team: "Red Bull Racing", points: 102, wins: 0 },
+  { position: 5, team: "Alpine", points: 57, wins: 0 },
 ];

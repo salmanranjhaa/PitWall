@@ -246,13 +246,14 @@ DRIVER_PROFILES: Dict[int, DriverProfile] = {
     ),
 
     # ── Kimi Antonelli — #12 (Mercedes) ──────────────────────────────
-    # Prodigy in year two: genuinely quick, still raw in wheel-to-wheel
+    # The 2026 revelation: leading the championship in year two, poles,
+    # sprint wins — raw speed now matched by far better control
     12: DriverProfile(
         name="Kimi Antonelli", number=12,
-        qualifying_pace=92, race_pace=89,
-        overtaking=85, defending=79, start_skill=82,
-        control=79, accuracy=83, tire_management=80,
-        experience=74, adaptability=85,
+        qualifying_pace=95, race_pace=94,
+        overtaking=88, defending=84, start_skill=86,
+        control=87, accuracy=89, tire_management=86,
+        experience=78, adaptability=90,
     ),
 
     # ── Fernando Alonso — #14 (Aston Martin) ─────────────────────────
@@ -304,23 +305,24 @@ DRIVER_PROFILES: Dict[int, DriverProfile] = {
     ),
 
     # ── Liam Lawson — #30 (Racing Bulls) ─────────────────────────────
-    # Fearless and combative, sometimes over the limit
+    # Team leader now: three straight double-points finishes in 2026,
+    # combative but far more complete than the 2025 version
     30: DriverProfile(
         name="Liam Lawson", number=30,
-        qualifying_pace=86, race_pace=85,
-        overtaking=85, defending=81, start_skill=82,
-        control=78, accuracy=80, tire_management=79,
-        experience=77, adaptability=84,
+        qualifying_pace=87, race_pace=87,
+        overtaking=86, defending=83, start_skill=83,
+        control=82, accuracy=84, tire_management=82,
+        experience=80, adaptability=85,
     ),
 
     # ── Arvid Lindblad — #41 (Racing Bulls) ──────────────────────────
-    # Teenage rookie: flashes of serious speed, plenty of rough edges
+    # Teenage rookie showing consistency few expected — regular points
     41: DriverProfile(
         name="Arvid Lindblad", number=41,
-        qualifying_pace=85, race_pace=81,
-        overtaking=81, defending=73, start_skill=78,
-        control=72, accuracy=75, tire_management=73,
-        experience=62, adaptability=78,
+        qualifying_pace=86, race_pace=84,
+        overtaking=83, defending=77, start_skill=80,
+        control=77, accuracy=80, tire_management=77,
+        experience=66, adaptability=81,
     ),
 
     # ── Pierre Gasly — #10 (Alpine) ──────────────────────────────────

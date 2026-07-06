@@ -87,7 +87,7 @@ DRIVER_DATABASE: Dict[str, Driver] = {
     "RUS": Driver("George Russell", "Mercedes", 63,
                   skill=0.93, aggression=0.76, consistency=0.93, wet_skill=0.90, base_pace=87.9),
     "ANT": Driver("Kimi Antonelli", "Mercedes", 12,
-                  skill=0.88, aggression=0.77, consistency=0.84, wet_skill=0.87, base_pace=88.3),
+                  skill=0.94, aggression=0.78, consistency=0.90, wet_skill=0.91, base_pace=87.5),
 
     # Aston Martin — Honda works power + Newey design bump for 2026
     "ALO": Driver("Fernando Alonso", "Aston Martin", 14,
@@ -103,13 +103,13 @@ DRIVER_DATABASE: Dict[str, Driver] = {
 
     # Racing Bulls — Lawson + Lindblad
     "LAW": Driver("Liam Lawson", "Racing Bulls", 30,
-                  skill=0.85, aggression=0.81, consistency=0.80, wet_skill=0.84, base_pace=89.3),
+                  skill=0.87, aggression=0.81, consistency=0.84, wet_skill=0.85, base_pace=88.9),
     "LIN": Driver("Arvid Lindblad", "Racing Bulls", 41,
-                  skill=0.81, aggression=0.79, consistency=0.75, wet_skill=0.79, base_pace=89.7),
+                  skill=0.84, aggression=0.79, consistency=0.80, wet_skill=0.81, base_pace=89.0),
 
     # Alpine — Gasly + Colapinto
     "GAS": Driver("Pierre Gasly", "Alpine", 10,
-                  skill=0.87, aggression=0.78, consistency=0.84, wet_skill=0.89, base_pace=89.5),
+                  skill=0.88, aggression=0.78, consistency=0.86, wet_skill=0.89, base_pace=88.8),
     "COL": Driver("Franco Colapinto", "Alpine", 43,
                   skill=0.82, aggression=0.80, consistency=0.77, wet_skill=0.80, base_pace=89.9),
 
@@ -132,20 +132,25 @@ DRIVER_DATABASE: Dict[str, Driver] = {
                   skill=0.85, aggression=0.68, consistency=0.87, wet_skill=0.86, base_pace=90.4),
 }
 
-# Team base pace — plausible 2026 pecking order under the new regulations
-# (lower = faster). New entries Audi and Cadillac start at the back.
+# Team base pace — actual 2026 mid-season pecking order (lower = faster).
+# Mercedes dominates the new regulations (Antonelli leads the WDC, 7 wins by
+# Silverstone); Ferrari clear second; McLaren third. Red Bull's in-house PU is
+# strong but the RB22 chassis is "terrible" (Verstappen). Alpine lead the
+# midfield on Mercedes customer power; Racing Bulls and Haas close behind.
+# Williams is overweight and pointless-ish; Aston Martin's works Honda PU is
+# >4% adrift — the class backmarker despite the Newey chassis.
 TEAM_BASE_PACE: Dict[str, float] = {
-    "McLaren": 87.7,          # Reigning champions
+    "Mercedes": 87.5,         # Class of the field under 2026 regs
     "Ferrari": 87.9,
-    "Mercedes": 87.9,         # Strong 2026 power unit
-    "Red Bull Racing": 87.9,  # First year of in-house RBPT-Ford engine
-    "Aston Martin": 88.4,     # Newey car + Honda works deal
-    "Williams": 88.8,
-    "Racing Bulls": 89.3,
-    "Alpine": 89.5,           # Customer Mercedes power
-    "Haas": 89.6,
-    "Audi": 89.9,             # Works team debut
-    "Cadillac": 90.3,         # Brand-new entry
+    "McLaren": 88.1,          # Fell back after dominating the old regs
+    "Red Bull Racing": 88.3,  # Good RBPT-Ford engine, difficult chassis
+    "Alpine": 88.8,           # Best of the midfield (Mercedes customer PU)
+    "Racing Bulls": 88.9,
+    "Haas": 89.1,
+    "Cadillac": 89.3,         # Respectable debut season
+    "Audi": 89.4,             # Works team debut
+    "Williams": 89.6,         # Overweight FW48
+    "Aston Martin": 89.9,     # Honda PU >4% down — nightmare season
 }
 
 # Team metadata shared with the API layer (colors, short codes, 2026 identity)
