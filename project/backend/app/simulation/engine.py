@@ -268,6 +268,7 @@ class RaceEngine:
         race_month: int = 7,
         random_seed: Optional[int] = None,
         player_driver: Optional[int] = None,
+        starting_grid: Optional[List[int]] = None,
     ) -> None:
         """
         Initialize the race engine.
@@ -281,6 +282,8 @@ class RaceEngine:
             race_month: Month of the race (1-12) for weather patterns.
             random_seed: Optional seed for reproducible race outcomes.
             player_driver: Driver number for the player (None = team's first driver).
+            starting_grid: Driver numbers in grid order (pole first) from a
+                completed qualifying session. None = engine simulates its own.
         """
         self.track = track
         self.player_team = player_team
@@ -288,6 +291,7 @@ class RaceEngine:
         self.air_temp = air_temperature if air_temperature is not None else air_temp
         self.race_month = race_month
         self.player_driver_number = player_driver
+        self._starting_grid_numbers = starting_grid
         self._seed = random_seed
         self._rng = random.Random(random_seed)
 
@@ -397,8 +401,15 @@ class RaceEngine:
         # Initialize weather
         weather = self._weather_system.initialize()
 
-        # Qualifying simulation → realistic grid order
-        grid_drivers = self._simulate_qualifying()
+        # Grid order: use the player's actual qualifying result when supplied,
+        # otherwise simulate a realistic qualifying internally.
+        if self._starting_grid_numbers:
+            by_num = {d.number: d for d in DRIVER_DATABASE.values()}
+            grid_drivers = [by_num[n] for n in self._starting_grid_numbers if n in by_num]
+            grid_drivers += [d for d in DRIVER_DATABASE.values()
+                             if d.number not in set(self._starting_grid_numbers)]
+        else:
+            grid_drivers = self._simulate_qualifying()
 
         # Resolve track name for ML predictor
         track_name = getattr(self.track, "name", "default").lower().replace(" ", "_")

@@ -39,6 +39,8 @@ export interface StartRacePayload {
   starting_compound: string;
   air_temperature: number;
   player_driver?: number;
+  /** Driver numbers in grid order (pole first) from qualifying */
+  starting_grid?: number[];
 }
 
 // ---------------------------------------------------------------------------

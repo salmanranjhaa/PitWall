@@ -425,17 +425,19 @@ export default function TrackMap({ trackKey, cars, playerTeam, className = "", a
               isLeader={isLeader}
               lapsDown={lapsDown}
               gRef={(el) => {
+                // NB: React re-invokes this with null + el on EVERY render (new
+                // function identity), so this must be idempotent — never clear
+                // animation state here or cars freeze between frames.
                 if (el) {
                   elsRef.current.set(key, el);
-                  // Position immediately on mount so the dot never flashes at origin
+                  // Position immediately on (re)attach so the dot never flashes at origin
                   const st = animRef.current.get(key);
                   if (st) {
                     const [x, y] = interpolate(points, dists, ((st.abs % 1.0) + 1.0) % 1.0);
                     el.setAttribute("transform", `translate(${x} ${y})`);
                   }
-                } else {
+                } else if (elsRef.current.get(key)) {
                   elsRef.current.delete(key);
-                  animRef.current.delete(key);
                 }
               }}
             />

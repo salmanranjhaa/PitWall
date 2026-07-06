@@ -594,6 +594,8 @@ export default function Qualifying() {
         starting_compound: compound,
         air_temperature: temperature,
         player_driver: playerDriver,
+        // Race grid = the qualifying result the player just earned
+        starting_grid: state?.starting_grid?.map((e) => e.number),
       });
       localStorage.setItem("f1_session_id", result.session_id);
       localStorage.setItem("f1_starting_compound", compound);

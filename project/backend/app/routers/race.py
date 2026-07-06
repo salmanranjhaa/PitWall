@@ -10,7 +10,7 @@ import json
 import logging
 import sys
 import os
-from typing import AsyncGenerator, Dict, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -91,6 +91,10 @@ class StartRaceRequest(BaseModel):
     starting_compound: str = Field(default="SOFT", description="Starting tire compound")
     air_temperature: float = Field(default=25.0, description="Ambient air temperature (°C)")
     player_driver: Optional[int] = Field(default=None, description="Driver number (None = team lead driver)")
+    starting_grid: Optional[List[int]] = Field(
+        default=None,
+        description="Driver numbers in grid order (pole first) from qualifying; None = simulate internally",
+    )
 
 
 class PitRequest(BaseModel):
@@ -141,6 +145,7 @@ def start_race(req: StartRaceRequest):
         starting_compound=req.starting_compound,
         air_temp=req.air_temperature,
         player_driver=req.player_driver,
+        starting_grid=req.starting_grid,
     )
     state = engine.start_race()
     session_id = f"race_{len(_race_engines)}"

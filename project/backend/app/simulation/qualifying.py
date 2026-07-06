@@ -26,7 +26,10 @@ from typing import Any, Dict, List, Optional, Tuple
 # and the API can never disagree about who drives for whom.
 # tier: Champion / Experienced / Midfield / Rookie (from overall skill)
 # ---------------------------------------------------------------------------
-from .ai_opponents import DRIVER_DATABASE
+from .ai_opponents import DRIVER_DATABASE, TEAM_BASE_PACE
+
+# Field-average car pace — car deltas in qualifying are computed around this
+_PACE_MID = sum(TEAM_BASE_PACE.values()) / len(TEAM_BASE_PACE)
 
 
 def _tier_for_skill(skill: float) -> str:
@@ -178,14 +181,20 @@ class QualifyingEngine:
 
     def _build_drivers(self) -> List[QDriver]:
         drivers = []
+        player_assigned = False
         for d in DRIVER_ROSTER:
+            # Exactly one player: without an explicit number, the first roster
+            # driver of the team is the player and the teammate stays AI.
             is_player = (
-                d["team"] == self.player_team
+                not player_assigned
+                and d["team"] == self.player_team
                 and (
                     self.player_driver_number is None
                     or d["number"] == self.player_driver_number
                 )
             )
+            if is_player:
+                player_assigned = True
             drivers.append(QDriver(
                 name=d["name"],
                 number=d["number"],
@@ -245,10 +254,13 @@ class QualifyingEngine:
         """
         compound_penalty = COMPOUND_DELTA.get(driver.compound, 0.0)
         evo_bonus = self._track_evolution * 0.015          # max −1.5% when fully rubbered
-        # Skill range: 0.800–0.990. Maps to ±2.5% around mid-skill (0.895)
-        skill_bonus = (driver.skill - 0.895) * 0.28
+        # Modern F1 qualifying: the car dominates (±~1.4% across the field),
+        # the driver is worth a few tenths on top (±~0.6%).
+        team_pace = TEAM_BASE_PACE.get(driver.team, _PACE_MID)
+        car_delta = (team_pace - _PACE_MID) / _PACE_MID
+        skill_bonus = (driver.skill - 0.895) * 0.07
         noise = self._rng.gauss(0.0, 0.0025)
-        lap_time = self._base_time * (1.0 + compound_penalty - evo_bonus - skill_bonus + noise)
+        lap_time = self._base_time * (1.0 + compound_penalty + car_delta - evo_bonus - skill_bonus + noise)
         lap_time = max(lap_time, self._base_time * 0.94)   # hard floor
 
         driver.last_time = lap_time
